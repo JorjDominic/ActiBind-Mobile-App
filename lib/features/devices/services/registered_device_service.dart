@@ -88,6 +88,34 @@ class RegisteredDeviceService {
     return (rows.first as Map<String, dynamic>)['device_name'] as String;
   }
 
+  static Future<String> reconnectWithCode({
+    required String deviceId,
+    required String code,
+  }) async {
+    final normalized = code
+        .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+        .toUpperCase();
+    if (normalized.length != 8) {
+      throw const FormatException('Enter the 8-character pairing code.');
+    }
+    final result = await _supabase.rpc(
+      'reconnect_registered_device',
+      params: {
+        'p_device_id': deviceId,
+        'p_pairing_code_hash': sha256
+            .convert(utf8.encode(normalized))
+            .toString(),
+      },
+    );
+    final rows = result as List<dynamic>;
+    if (rows.isEmpty) {
+      throw const FormatException(
+        'The pairing code is invalid, expired, or belongs to an unavailable device.',
+      );
+    }
+    return (rows.first as Map<String, dynamic>)['device_name'] as String;
+  }
+
   static Future<DevicePairing> renewPairingCode(RegisteredDevice device) async {
     if (device.connected) {
       throw const FormatException('This device is already connected.');

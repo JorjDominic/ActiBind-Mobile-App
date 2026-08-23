@@ -1,5 +1,6 @@
 import 'package:actibind/core/services/supabase_service.dart';
 import 'package:actibind/features/devices/models/device_app_activity.dart';
+import 'package:actibind/features/devices/models/device_app_window_activity.dart';
 
 class DeviceAppActivityService {
   DeviceAppActivityService._();
@@ -28,4 +29,26 @@ class DeviceAppActivityService {
       '${value.year.toString().padLeft(4, '0')}-'
       '${value.month.toString().padLeft(2, '0')}-'
       '${value.day.toString().padLeft(2, '0')}';
+
+  static Future<List<DeviceAppWindowActivity>> getWindowBreakdown({
+    required String deviceId,
+    required DateTime start,
+    required DateTime end,
+    required String appName,
+    required String packageName,
+  }) async {
+    if (end.isBefore(start)) {
+      throw const FormatException('The activity date range is invalid.');
+    }
+    final response = await SupabaseService.client
+        .from('device_app_window_activity')
+        .select('window_title,total_seconds')
+        .eq('device_id', deviceId)
+        .eq('app_name', appName)
+        .eq('package_name', packageName)
+        .gte('usage_date', _date(start))
+        .lte('usage_date', _date(end))
+        .order('total_seconds', ascending: false);
+    return response.map(DeviceAppWindowActivity.fromJson).toList();
+  }
 }

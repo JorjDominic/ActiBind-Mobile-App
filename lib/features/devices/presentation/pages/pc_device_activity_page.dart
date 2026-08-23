@@ -1,5 +1,6 @@
 import 'package:actibind/core/theme/app_colors.dart';
 import 'package:actibind/features/devices/models/device_app_activity.dart';
+import 'package:actibind/features/devices/models/device_app_window_activity.dart';
 import 'package:actibind/features/devices/models/registered_device.dart';
 import 'package:actibind/features/devices/services/device_app_activity_service.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,29 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
   String? error;
   List<DeviceAppActivity> rows = const [];
 
+  DateTime get _end => DateTime.now();
+  DateTime get _start =>
+      range == 'Week' ? _end.subtract(const Duration(days: 6)) : _end;
+
+  List<_AppSummary> get apps {
+    final grouped = <String, _AppSummary>{};
+    for (final row in rows) {
+      final key = '${row.appName}\u0000${row.packageName}';
+      grouped.update(
+        key,
+        (value) => value.add(row.totalSeconds),
+        ifAbsent: () => _AppSummary(
+          appName: row.appName,
+          packageName: row.packageName,
+          totalSeconds: row.totalSeconds,
+        ),
+      );
+    }
+    final result = grouped.values.toList()
+      ..sort((a, b) => b.totalSeconds.compareTo(a.totalSeconds));
+    return result;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -31,14 +55,10 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
       error = null;
     });
     try {
-      final end = DateTime.now();
-      final start = range == 'Week'
-          ? end.subtract(const Duration(days: 6))
-          : end;
       final result = await DeviceAppActivityService.getForDevice(
         deviceId: widget.device.id,
-        start: start,
-        end: end,
+        start: _start,
+        end: _end,
       );
       if (mounted) setState(() => rows = result);
     } catch (exception) {
@@ -106,7 +126,7 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
             const LinearProgressIndicator()
           else if (error != null)
             _Message('Could not load PC activity.\n$error')
-          else if (rows.isEmpty)
+          else if (apps.isEmpty)
             const _Message('No synchronized PC activity for this period.')
           else ...[
             Row(
@@ -114,7 +134,7 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
                 Expanded(
                   child: _Stat(
                     _duration(
-                      rows.fold(0, (sum, row) => sum + row.totalSeconds),
+                      apps.fold(0, (sum, app) => sum + app.totalSeconds),
                     ),
                     'Tracked usage',
                     AppColors.indigo,
@@ -122,7 +142,7 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _Stat(rows.first.appName, 'Most used', AppColors.teal),
+                  child: _Stat(apps.first.appName, 'Most used', AppColors.teal),
                 ),
               ],
             ),
@@ -131,23 +151,45 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
               'Desktop usage',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            for (final row in rows)
+            const SizedBox(height: 4),
+            for (final app in apps)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const CircleAvatar(
                   child: Icon(Icons.desktop_windows_rounded, size: 19),
                 ),
-                title: Text(row.appName),
-                subtitle: row.packageName.isEmpty
-                    ? null
-                    : Text(row.packageName, maxLines: 1),
+                title: Text(app.appName),
+                subtitle: Text(
+                  app.packageName.isEmpty
+                      ? 'View window details'
+                      : '${app.packageName} · View details',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 trailing: Text(
-                  _duration(row.totalSeconds),
+                  _duration(app.totalSeconds),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
+                onTap: () => _showWindows(app),
               ),
           ],
         ],
+      ),
+    ),
+  );
+
+  Future<void> _showWindows(_AppSummary app) => showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (_) => _WindowSheet(
+      app: app,
+      future: DeviceAppActivityService.getWindowBreakdown(
+        deviceId: widget.device.id,
+        start: _start,
+        end: _end,
+        appName: app.appName,
+        packageName: app.packageName,
       ),
     ),
   );
@@ -158,6 +200,91 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
     final minutes = duration.inMinutes.remainder(60);
     return hours == 0 ? '${minutes}m' : '${hours}h ${minutes}m';
   }
+}
+
+class _AppSummary {
+  const _AppSummary({
+    required this.appName,
+    required this.packageName,
+    required this.totalSeconds,
+  });
+  final String appName;
+  final String packageName;
+  final int totalSeconds;
+  _AppSummary add(int seconds) => _AppSummary(
+    appName: appName,
+    packageName: packageName,
+    totalSeconds: totalSeconds + seconds,
+  );
+}
+
+class _WindowSheet extends StatelessWidget {
+  const _WindowSheet({required this.app, required this.future});
+  final _AppSummary app;
+  final Future<List<DeviceAppWindowActivity>> future;
+
+  @override
+  Widget build(BuildContext context) => FractionallySizedBox(
+    heightFactor: .72,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(app.appName, style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            '${_PcDeviceActivityPageState._duration(app.totalSeconds)} total usage',
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: FutureBuilder<List<DeviceAppWindowActivity>>(
+              future: future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const _Message('Could not load window activity.');
+                }
+                final totals = <String, int>{};
+                for (final row
+                    in snapshot.data ?? const <DeviceAppWindowActivity>[]) {
+                  totals[row.windowTitle] =
+                      (totals[row.windowTitle] ?? 0) + row.totalSeconds;
+                }
+                final windows = totals.entries.toList()
+                  ..sort((a, b) => b.value.compareTo(a.value));
+                if (windows.isEmpty) {
+                  return const _Message(
+                    'No window details were recorded for this app.',
+                  );
+                }
+                return ListView.separated(
+                  itemCount: windows.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, index) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.tab_rounded),
+                    title: Text(
+                      windows[index].key,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Text(
+                      _PcDeviceActivityPageState._duration(
+                        windows[index].value,
+                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Message extends StatelessWidget {

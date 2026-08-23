@@ -1199,6 +1199,36 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
     }
   }
 
+  Future<void> _reconnectDevice(RegisteredDevice device) async {
+    if (!device.isPc) {
+      await _renewPairingCode(device);
+      return;
+    }
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ConnectDeviceDialog(),
+    );
+    if (code == null || code.trim().isEmpty || !mounted) return;
+    try {
+      final name = await RegisteredDeviceService.reconnectWithCode(
+        deviceId: device.id,
+        code: code,
+      );
+      await _loadDevices();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$name is connected again.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not reconnect device: $error')),
+        );
+      }
+    }
+  }
+
   void _openDevice(RegisteredDevice device) {
     if (device.isPc) {
       Navigator.of(context).push(
@@ -1280,6 +1310,7 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
                       onRenewPairing: () => _renewPairingCode(device),
                       onDeletePermanently: () =>
                           _deleteDevicePermanently(device),
+                      onReconnect: () => _reconnectDevice(device),
                     ),
                   ),
               ],
@@ -1658,12 +1689,14 @@ class _RegisteredDeviceCard extends StatelessWidget {
     required this.onRemove,
     required this.onRenewPairing,
     required this.onDeletePermanently,
+    required this.onReconnect,
   });
   final RegisteredDevice device;
   final VoidCallback onTap;
   final VoidCallback onRemove;
   final VoidCallback onRenewPairing;
   final VoidCallback onDeletePermanently;
+  final VoidCallback onReconnect;
   @override
   Widget build(BuildContext context) => shad.Card(
     child: InkWell(
@@ -1720,6 +1753,7 @@ class _RegisteredDeviceCard extends StatelessWidget {
               onSelected: (value) {
                 if (value == 'pair') return onRenewPairing();
                 if (value == 'delete') return onDeletePermanently();
+                if (value == 'reconnect') return onReconnect();
                 return onRemove();
               },
               itemBuilder: (_) => [
@@ -1740,6 +1774,15 @@ class _RegisteredDeviceCard extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.link_off_rounded),
                       title: Text('Disconnect device'),
+                    ),
+                  ),
+                if (!device.connected && device.revokedAt != null)
+                  const PopupMenuItem(
+                    value: 'reconnect',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.link_rounded),
+                      title: Text('Reconnect device'),
                     ),
                   ),
                 const PopupMenuItem(
