@@ -679,8 +679,8 @@ begin
   end if;
 
   select count(*) into active_pairings
-  from private.device_pairing_requests
-  where claimed_at is null and expires_at > now();
+  from private.device_pairing_requests request
+  where request.claimed_at is null and request.expires_at > now();
 
   if active_pairings >= 10000 then
     return query select null::uuid, null::timestamptz, 'pairing_capacity_reached'::text;
@@ -964,12 +964,12 @@ begin
     return;
   end if;
 
-  update public.registered_devices
+  update public.registered_devices as device
   set last_seen_at = now()
-  where id = p_device_id
-    and user_id = owner_id
-    and connected = true
-    and revoked_at is null;
+  where device.id = p_device_id
+    and device.user_id = owner_id
+    and device.connected = true
+    and device.revoked_at is null;
 
   return query
   select

@@ -1083,7 +1083,9 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'On ${pairing.device.name}, open ActiBind, go to Activity > Device Activity, and choose Connect this device.',
+            pairing.device.isPc
+                ? 'On ${pairing.device.name}, open the ActiBind PC collector and enter this code. The mobile app remains the controller.'
+                : 'On ${pairing.device.name}, open ActiBind, go to Activity > Device Activity, and choose Connect this device.',
           ),
           const SizedBox(height: 18),
           SelectableText(
@@ -1243,7 +1245,7 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
               ),
               TextButton(
                 onPressed: _connectThisDevice,
-                child: const Text('Connect this device'),
+                child: const Text('Enter pairing code'),
               ),
             ],
           ),
@@ -1494,7 +1496,7 @@ class _ConnectDeviceDialogState extends State<_ConnectDeviceDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Connect this device'),
+    title: const Text('Enter pairing code'),
     content: TextField(
       controller: _controller,
       autofocus: true,
@@ -1560,13 +1562,10 @@ class _RegisterDeviceSheetState extends State<_RegisterDeviceSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Add a mobile device',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Add a device', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 5),
             Text(
-              'For a PC, start pairing in the ActiBind PC app and use Connect this device.',
+              'PC pairing starts in the ActiBind PC Companion. Enter its code from the device list.',
               style: TextStyle(
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1640,7 +1639,7 @@ class _NoDevicesCard extends StatelessWidget {
               PopupMenuItem(value: 'add', child: Text('Add a device')),
               PopupMenuItem(
                 value: 'connect',
-                child: Text('Connect this device'),
+                child: Text('Enter pairing code'),
               ),
             ],
             icon: const Icon(Icons.add_circle_outline_rounded),

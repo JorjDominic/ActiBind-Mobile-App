@@ -14,7 +14,8 @@ function json(body: unknown, status = 200) {
 }
 
 async function clientKey(request: Request) {
-  const secret = Deno.env.get("DEVICE_SYNC_RATE_LIMIT_SECRET");
+  const secret = Deno.env.get("DEVICE_RATE_LIMIT_SALT") ??
+    Deno.env.get("DEVICE_SYNC_RATE_LIMIT_SECRET");
   if (!secret) throw new Error("Device sync rate-limit secret is not configured");
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const identity = forwarded || request.headers.get("cf-connecting-ip") || "unknown";
@@ -46,7 +47,19 @@ const actions: Record<string, { rpc: string; params: Record<string, string> }> =
     rpc: "edge_get_registered_device_status",
     params: { device_id: "p_device_id", device_secret: "p_device_secret" },
   },
+  check_connection: {
+    rpc: "edge_get_registered_device_status",
+    params: { device_id: "p_device_id", device_secret: "p_device_secret" },
+  },
+  check_status: {
+    rpc: "edge_get_registered_device_status",
+    params: { device_id: "p_device_id", device_secret: "p_device_secret" },
+  },
   upload_activity: {
+    rpc: "edge_upload_device_app_activity",
+    params: { device_id: "p_device_id", device_secret: "p_device_secret", rows: "p_rows" },
+  },
+  upload: {
     rpc: "edge_upload_device_app_activity",
     params: { device_id: "p_device_id", device_secret: "p_device_secret", rows: "p_rows" },
   },
@@ -67,9 +80,19 @@ Deno.serve(async (request) => {
   try {
     const contentLength = Number(request.headers.get("content-length") ?? "0");
     if (contentLength > 512_000) return json({ error: "payload_too_large" }, 413);
-    const body = await request.json() as Record<string, unknown>;
+    const rawBody = await request.json() as Record<string, unknown>;
+    const body: Record<string, unknown> = {
+      ...rawBody,
+      device_id: rawBody.device_id ?? rawBody.deviceId,
+      device_secret: rawBody.device_secret ?? rawBody.deviceSecret,
+      rows: rawBody.rows ?? rawBody.activities ?? rawBody.activity_rows,
+      current_device_secret:
+        rawBody.current_device_secret ?? rawBody.currentDeviceSecret,
+      new_device_secret_hash:
+        rawBody.new_device_secret_hash ?? rawBody.newDeviceSecretHash,
+    };
     const action = typeof body.action === "string" ? actions[body.action] : null;
-    if (!action) return json({ error: "invalid_action" }, 400);
+    if (!action) return json({ error_code: "invalid_action" }, 400);
 
     const params: Record<string, unknown> = { p_client_key: await clientKey(request) };
     for (const [input, rpcName] of Object.entries(action.params)) params[rpcName] = body[input];
@@ -81,11 +104,21 @@ Deno.serve(async (request) => {
     const { data, error } = await supabase.rpc(action.rpc, params);
     if (error) {
       console.error("device-sync RPC failed", { action: body.action, code: error.code });
-      return json({ error: "device_sync_failed" }, 400);
+      return json({
+        error_code: "device_sync_failed",
+        diagnostic: error.code,
+      }, 500);
     }
-    return json({ data });
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result && typeof result === "object" && "error_code" in result) {
+      const errorCode = (result as Record<string, unknown>).error_code;
+      const status = errorCode === "rate_limited" ? 429 : 200;
+      return json(result, status);
+    }
+    if (typeof result === "boolean") return json({ ok: result });
+    return json(result ?? { error_code: "empty_response" }, result == null ? 500 : 200);
   } catch (error) {
     console.error("device-sync request failed", error instanceof Error ? error.message : "unknown");
-    return json({ error: "invalid_request" }, 400);
+    return json({ error_code: "invalid_request" }, 400);
   }
 });

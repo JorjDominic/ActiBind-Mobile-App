@@ -33,7 +33,7 @@ class RegisteredDeviceService {
   }) async {
     if (type == 'pc') {
       throw const FormatException(
-        'Start pairing in the ActiBind PC app, then connect its code here.',
+        'Create the pairing code in the ActiBind PC Companion, then enter it on this phone.',
       );
     }
     final user = _supabase.auth.currentUser;
