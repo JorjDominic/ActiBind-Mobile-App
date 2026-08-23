@@ -6,6 +6,9 @@ class RegisteredDevice {
     required this.type,
     required this.platform,
     required this.connected,
+    required this.pairingExpiresAt,
+    required this.lastSeenAt,
+    required this.revokedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -16,6 +19,9 @@ class RegisteredDevice {
   final String type;
   final String platform;
   final bool connected;
+  final DateTime? pairingExpiresAt;
+  final DateTime? lastSeenAt;
+  final DateTime? revokedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,6 +35,15 @@ class RegisteredDevice {
         type: json['device_type'] as String,
         platform: json['platform'] as String? ?? 'Other',
         connected: json['connected'] as bool? ?? true,
+        pairingExpiresAt: json['pairing_expires_at'] == null
+            ? null
+            : DateTime.parse(json['pairing_expires_at'] as String).toLocal(),
+        lastSeenAt: json['last_seen_at'] == null
+            ? null
+            : DateTime.parse(json['last_seen_at'] as String).toLocal(),
+        revokedAt: json['revoked_at'] == null
+            ? null
+            : DateTime.parse(json['revoked_at'] as String).toLocal(),
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
         updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
       );

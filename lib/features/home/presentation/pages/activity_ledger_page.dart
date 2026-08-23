@@ -965,7 +965,6 @@ class _DeviceActivityView extends StatefulWidget {
 
 class _DeviceActivityViewState extends State<_DeviceActivityView>
     with WidgetsBindingObserver {
-  static const _deviceRegistrationEnabled = false;
   String range = 'Today';
   List<RegisteredDevice> devices = const [];
   bool devicesLoading = true;
@@ -1059,12 +1058,13 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
     );
     if (draft == null || !mounted) return;
     try {
-      await RegisteredDeviceService.createDevice(
+      final pairing = await RegisteredDeviceService.createDevice(
         name: draft.name,
         type: draft.type,
         platform: draft.platform,
       );
       await _loadDevices();
+      if (mounted) await _showPairingCode(pairing);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1074,14 +1074,124 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
     }
   }
 
+  Future<void> _showPairingCode(DevicePairing pairing) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Pair your device'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'On ${pairing.device.name}, open ActiBind, go to Activity > Device Activity, and choose Connect this device.',
+          ),
+          const SizedBox(height: 18),
+          SelectableText(
+            '${pairing.code.substring(0, 4)} ${pairing.code.substring(4)}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: 4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'This one-time code expires in 15 minutes.',
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _connectThisDevice() async {
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ConnectDeviceDialog(),
+    );
+    if (code == null || code.trim().isEmpty || !mounted) return;
+    try {
+      final name = await RegisteredDeviceService.connectWithCode(code);
+      await _loadDevices();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$name is now connected.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not connect device: $error')),
+        );
+      }
+    }
+  }
+
   Future<void> _removeDevice(RegisteredDevice device) async {
     try {
-      await RegisteredDeviceService.deleteDevice(device.id);
+      if (device.connected) {
+        await RegisteredDeviceService.revokeDevice(device.id);
+      } else {
+        await RegisteredDeviceService.deleteDevicePermanently(device.id);
+      }
       await _loadDevices();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not remove device: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDevicePermanently(RegisteredDevice device) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete device permanently?'),
+        content: Text(
+          '${device.name} and all of its synchronized activity history will be permanently deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await RegisteredDeviceService.deleteDevicePermanently(device.id);
+      await _loadDevices();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete device: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _renewPairingCode(RegisteredDevice device) async {
+    try {
+      final pairing = await RegisteredDeviceService.renewPairingCode(device);
+      await _loadDevices();
+      if (mounted) await _showPairingCode(pairing);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not create a new code: $error')),
         );
       }
     }
@@ -1123,10 +1233,19 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
               ],
             ),
           ),
-          FilledButton.icon(
-            onPressed: _deviceRegistrationEnabled ? _registerDevice : null,
-            icon: const Icon(Icons.lock_outline_rounded),
-            label: const Text('Register'),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FilledButton.icon(
+                onPressed: _registerDevice,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add device'),
+              ),
+              TextButton(
+                onPressed: _connectThisDevice,
+                child: const Text('Connect this device'),
+              ),
+            ],
           ),
         ],
       ),
@@ -1135,24 +1254,35 @@ class _DeviceActivityViewState extends State<_DeviceActivityView>
         const LinearProgressIndicator()
       else if (devices.isEmpty)
         _NoDevicesCard(
-          onRegister: _deviceRegistrationEnabled ? _registerDevice : null,
+          onRegister: _registerDevice,
+          onConnect: _connectThisDevice,
         )
       else
-        SizedBox(
-          height: 92,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: devices.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final device = devices[index];
-              return _RegisteredDeviceCard(
-                device: device,
-                onTap: () => _openDevice(device),
-                onRemove: () => _removeDevice(device),
-              );
-            },
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 10.0;
+            final columns = constraints.maxWidth >= 600 ? 2 : 1;
+            final cardWidth =
+                (constraints.maxWidth - (spacing * (columns - 1))) / columns;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final device in devices)
+                  SizedBox(
+                    width: cardWidth,
+                    child: _RegisteredDeviceCard(
+                      device: device,
+                      onTap: () => _openDevice(device),
+                      onRemove: () => _removeDevice(device),
+                      onRenewPairing: () => _renewPairingCode(device),
+                      onDeletePermanently: () =>
+                          _deleteDevicePermanently(device),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       const SizedBox(height: 18),
       if (!UsageStatsService.isSupported) ...[
@@ -1344,6 +1474,49 @@ class _DeviceDraft {
   final String platform;
 }
 
+class _ConnectDeviceDialog extends StatefulWidget {
+  const _ConnectDeviceDialog();
+
+  @override
+  State<_ConnectDeviceDialog> createState() => _ConnectDeviceDialogState();
+}
+
+class _ConnectDeviceDialogState extends State<_ConnectDeviceDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _connect() => Navigator.pop(context, _controller.text);
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Connect this device'),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      textCapitalization: TextCapitalization.characters,
+      maxLength: 9,
+      decoration: const InputDecoration(
+        labelText: 'Pairing code',
+        hintText: 'ABCD 2345',
+        border: OutlineInputBorder(),
+      ),
+      onSubmitted: (_) => _connect(),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(onPressed: _connect, child: const Text('Connect')),
+    ],
+  );
+}
+
 class _RegisterDeviceSheet extends StatefulWidget {
   const _RegisterDeviceSheet();
   @override
@@ -1353,24 +1526,15 @@ class _RegisterDeviceSheet extends StatefulWidget {
 class _RegisterDeviceSheetState extends State<_RegisterDeviceSheet> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  String _type = 'mobile';
+  final String _type = 'mobile';
   String _platform = 'Android';
 
-  List<String> get _platforms => _type == 'pc'
-      ? const ['Windows', 'macOS', 'Linux', 'Other']
-      : const ['Android', 'iOS', 'Other'];
+  List<String> get _platforms => const ['Android', 'iOS', 'Other'];
 
   @override
   void dispose() {
     _name.dispose();
     super.dispose();
-  }
-
-  void _changeType(String type) {
-    setState(() {
-      _type = type;
-      _platform = type == 'pc' ? 'Windows' : 'Android';
-    });
   }
 
   void _save() {
@@ -1397,47 +1561,25 @@ class _RegisterDeviceSheetState extends State<_RegisterDeviceSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Register a device',
+              'Add a mobile device',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 5),
             Text(
-              'This is for your own activity monitoring and is separate from Family Mode.',
+              'For a PC, start pairing in the ActiBind PC app and use Connect this device.',
               style: TextStyle(
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 18),
-            SegmentedButton<String>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(
-                  value: 'mobile',
-                  icon: Icon(Icons.phone_android_rounded),
-                  label: Text('Mobile'),
-                ),
-                ButtonSegment(
-                  value: 'pc',
-                  icon: Icon(Icons.computer_rounded),
-                  label: Text('PC'),
-                ),
-              ],
-              selected: {_type},
-              onSelectionChanged: (value) => _changeType(value.first),
-            ),
-            const SizedBox(height: 16),
             TextFormField(
               controller: _name,
               autofocus: true,
               decoration: InputDecoration(
                 labelText: 'Device name',
-                hintText: _type == 'pc' ? 'My laptop' : 'My phone',
-                prefixIcon: Icon(
-                  _type == 'pc'
-                      ? Icons.laptop_rounded
-                      : Icons.smartphone_rounded,
-                ),
+                hintText: 'My phone',
+                prefixIcon: const Icon(Icons.smartphone_rounded),
                 border: const OutlineInputBorder(),
               ),
               validator: (value) => value == null || value.trim().isEmpty
@@ -1475,8 +1617,9 @@ class _RegisterDeviceSheetState extends State<_RegisterDeviceSheet> {
 }
 
 class _NoDevicesCard extends StatelessWidget {
-  const _NoDevicesCard({this.onRegister});
-  final VoidCallback? onRegister;
+  const _NoDevicesCard({required this.onRegister, required this.onConnect});
+  final VoidCallback onRegister;
+  final VoidCallback onConnect;
   @override
   Widget build(BuildContext context) => shad.Card(
     child: Padding(
@@ -1491,10 +1634,17 @@ class _NoDevicesCard extends StatelessWidget {
               style: TextStyle(fontSize: 13),
             ),
           ),
-          TextButton.icon(
-            onPressed: onRegister,
-            icon: const Icon(Icons.lock_outline_rounded, size: 16),
-            label: const Text('Locked'),
+          PopupMenuButton<String>(
+            onSelected: (value) => value == 'add' ? onRegister() : onConnect(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'add', child: Text('Add a device')),
+              PopupMenuItem(
+                value: 'connect',
+                child: Text('Connect this device'),
+              ),
+            ],
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            tooltip: 'Add or connect a device',
           ),
         ],
       ),
@@ -1507,68 +1657,103 @@ class _RegisteredDeviceCard extends StatelessWidget {
     required this.device,
     required this.onTap,
     required this.onRemove,
+    required this.onRenewPairing,
+    required this.onDeletePermanently,
   });
   final RegisteredDevice device;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+  final VoidCallback onRenewPairing;
+  final VoidCallback onDeletePermanently;
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 220,
-    child: shad.Card(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.indigo.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  device.isPc
-                      ? Icons.computer_rounded
-                      : Icons.smartphone_rounded,
-                  color: AppColors.indigo,
-                ),
+  Widget build(BuildContext context) => shad.Card(
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppColors.indigo.withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      device.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${device.platform} · ${device.isPc ? 'PC' : 'Mobile'}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                device.isPc ? Icons.computer_rounded : Icons.smartphone_rounded,
+                color: AppColors.indigo,
               ),
-              PopupMenuButton<String>(
-                tooltip: 'Device actions',
-                onSelected: (_) => onRemove(),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'remove', child: Text('Remove')),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    device.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${device.platform} · ${device.connected
+                        ? 'Connected'
+                        : device.revokedAt != null
+                        ? 'Disconnected'
+                        : 'Waiting for pairing'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
-            ],
-          ),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Device actions',
+              onSelected: (value) {
+                if (value == 'pair') return onRenewPairing();
+                if (value == 'delete') return onDeletePermanently();
+                return onRemove();
+              },
+              itemBuilder: (_) => [
+                if (!device.connected && device.revokedAt == null)
+                  const PopupMenuItem(
+                    value: 'pair',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.password_rounded),
+                      title: Text('Show new pairing code'),
+                      subtitle: Text('Replaces the previous code'),
+                    ),
+                  ),
+                if (device.connected)
+                  const PopupMenuItem(
+                    value: 'remove',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.link_off_rounded),
+                      title: Text('Disconnect device'),
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.delete_forever_outlined),
+                    title: Text('Delete permanently'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     ),
