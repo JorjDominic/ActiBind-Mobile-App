@@ -4,6 +4,7 @@ import 'package:actibind/features/devices/models/device_app_window_activity.dart
 import 'package:actibind/features/devices/models/registered_device.dart';
 import 'package:actibind/features/devices/services/device_app_activity_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 class PcDeviceActivityPage extends StatefulWidget {
@@ -96,7 +97,10 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     Text(
-                      '${widget.device.platform} · ${widget.device.connected ? 'Connected' : 'Disconnected'}',
+                      widget.device.platform,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -115,11 +119,31 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            widget.device.lastSeenAt == null
-                ? 'This PC has not synchronized yet.'
-                : 'Last seen ${DateFormat.yMMMd().add_jm().format(widget.device.lastSeenAt!)}',
+          const SizedBox(height: 12),
+          Card(
+            color: (widget.device.connected ? AppColors.teal : AppColors.coral)
+                .withValues(alpha: .08),
+            child: ListTile(
+              leading: Icon(
+                widget.device.connected
+                    ? Icons.cloud_done_rounded
+                    : Icons.cloud_off_rounded,
+                color: widget.device.connected
+                    ? AppColors.teal
+                    : AppColors.coral,
+              ),
+              title: Text(
+                widget.device.connected
+                    ? 'Connected and syncing'
+                    : 'Disconnected',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                widget.device.lastSeenAt == null
+                    ? 'No activity has been synchronized yet.'
+                    : 'Last seen ${DateFormat.yMMMd().add_jm().format(widget.device.lastSeenAt!)}',
+              ),
+            ),
           ),
           const SizedBox(height: 18),
           if (loading)
@@ -146,30 +170,31 @@ class _PcDeviceActivityPageState extends State<PcDeviceActivityPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            _Stat('${apps.length}', 'Apps used', AppColors.amber),
             const SizedBox(height: 18),
-            Text(
-              'Desktop usage',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'App usage',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                Text(
+                  range,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             for (final app in apps)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                  child: Icon(Icons.desktop_windows_rounded, size: 19),
-                ),
-                title: Text(app.appName),
-                subtitle: Text(
-                  app.packageName.isEmpty
-                      ? 'View window details'
-                      : '${app.packageName} · View details',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  _duration(app.totalSeconds),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+              _AppUsageCard(
+                app: app,
+                maximumSeconds: apps.first.totalSeconds,
                 onTap: () => _showWindows(app),
               ),
           ],
@@ -216,6 +241,248 @@ class _AppSummary {
     packageName: packageName,
     totalSeconds: totalSeconds + seconds,
   );
+}
+
+class _AppUsageCard extends StatelessWidget {
+  const _AppUsageCard({
+    required this.app,
+    required this.maximumSeconds,
+    required this.onTap,
+  });
+  final _AppSummary app;
+  final int maximumSeconds;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _appColor(app);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _OnlineAppIcon(app: app, color: color),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            app.appName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Text(
+                          _PcDeviceActivityPageState._duration(
+                            app.totalSeconds,
+                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      app.packageName.isEmpty
+                          ? 'View window details'
+                          : '${app.packageName} · View details',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        minHeight: 5,
+                        value: maximumSeconds == 0
+                            ? 0
+                            : app.totalSeconds / maximumSeconds,
+                        color: color,
+                        backgroundColor: color.withValues(alpha: .12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _identity(_AppSummary app) =>
+      '${app.appName} ${app.packageName}'.toLowerCase();
+
+  static Color _appColor(_AppSummary app) {
+    final id = _identity(app);
+    if (id.contains('chrome')) return const Color(0xFF4285F4);
+    if (id.contains('spotify')) return const Color(0xFF1DB954);
+    if (id.contains('code')) return const Color(0xFF007ACC);
+    if (id.contains('discord')) return const Color(0xFF5865F2);
+    if (id.contains('firefox')) return const Color(0xFFFF7139);
+    return AppColors.indigo;
+  }
+}
+
+class _OnlineAppIcon extends StatelessWidget {
+  const _OnlineAppIcon({required this.app, required this.color});
+  final _AppSummary app;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = _AppUsageCard._identity(app);
+    if (_isActiBindCompanion(id)) {
+      return Padding(
+        padding: const EdgeInsets.all(5),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: Image.asset(
+            'assets/icons/ActiBind Logo Dark Version.png',
+            width: 34,
+            height: 34,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      );
+    }
+
+    final iconPath = _iconPath(app);
+    final fallback = _InitialIcon(app: app, color: color);
+    if (iconPath == null) return fallback;
+    return Padding(
+      padding: const EdgeInsets.all(9),
+      child: SvgPicture.network(
+        'https://api.iconify.design/$iconPath.svg',
+        width: 26,
+        height: 26,
+        fit: BoxFit.contain,
+        placeholderBuilder: (_) => fallback,
+        errorBuilder: (_, _, _) => fallback,
+      ),
+    );
+  }
+
+  static String? _iconPath(_AppSummary app) {
+    final id = _AppUsageCard._identity(app);
+    if (id.contains('chrome')) return 'logos/chrome';
+    if (id.contains('edge')) return 'logos/microsoft-edge';
+    if (id.contains('firefox')) return 'logos/firefox';
+    if (id.contains('brave')) return 'logos/brave';
+    if (id.contains('opera')) return 'logos/opera';
+    if (id.contains('code') || id.contains('devenv')) {
+      return 'logos/visual-studio-code';
+    }
+    if (id.contains('android studio')) return 'logos/android-icon';
+    if (id.contains('intellij')) return 'logos/intellij-idea';
+    if (id.contains('pycharm')) return 'logos/pycharm';
+    if (id.contains('postman')) return 'logos/postman-icon';
+    if (id.contains('powershell')) return 'vscode-icons/file-type-powershell';
+    if (id.contains('python')) return 'logos/python';
+    if (id.contains('github')) return 'logos/github-icon';
+    if (id.contains('spotify')) return 'logos/spotify-icon';
+    if (id.contains('discord')) return 'logos/discord-icon';
+    if (id.contains('slack')) return 'logos/slack-icon';
+    if (id.contains('teams')) return 'logos/microsoft-teams';
+    if (id.contains('zoom')) return 'logos/zoom-icon';
+    if (id.contains('skype')) return 'logos/skype';
+    if (id.contains('telegram')) return 'logos/telegram';
+    if (id.contains('whatsapp')) return 'logos/whatsapp-icon';
+    if (id.contains('signal')) return 'logos/signal';
+    if (id.contains('word')) return 'vscode-icons/file-type-word';
+    if (id.contains('excel')) return 'vscode-icons/file-type-excel';
+    if (id.contains('powerpoint')) return 'vscode-icons/file-type-powerpoint';
+    if (id.contains('outlook')) return 'logos/microsoft-icon';
+    if (id.contains('onedrive')) return 'logos/microsoft-onedrive';
+    if (id.contains('notion')) return 'logos/notion-icon';
+    if (id.contains('obsidian')) return 'logos/obsidian-icon';
+    if (id.contains('figma')) return 'logos/figma';
+    if (id.contains('canva')) return 'thesvg-color/canva';
+    if (id.contains('blender')) return 'logos/blender';
+    if (id.contains('photoshop')) return 'logos/adobe-photoshop';
+    if (id.contains('illustrator')) return 'logos/adobe-illustrator';
+    if (id.contains('acrobat')) return 'selfhst/adobe-acrobat';
+    if (id.contains('dropbox')) return 'logos/dropbox';
+    if (id.contains('google drive')) return 'logos/google-drive';
+    if (id.contains('steam')) return 'logos/steam';
+    if (id.contains('epic')) return 'streamline-color/epic-games-1';
+    if (id.contains('unity')) return 'logos/unity';
+    if (id.contains('unreal')) return 'logos/unrealengine-icon';
+    if (id.contains('roblox')) return 'material-icon-theme/roblox';
+    if (id.contains('twitch')) return 'logos/twitch';
+    if (id.contains('youtube')) return 'logos/youtube-icon';
+    if (id.contains('vlc')) return 'flat-color-icons/vlc';
+    if (id.contains('netflix')) return 'logos/netflix-icon';
+    if (id.contains('facebook')) return 'logos/facebook';
+    if (id.contains('instagram')) return 'skill-icons/instagram';
+    if (id.contains('tiktok')) return 'logos/tiktok-icon';
+    if (id.contains('reddit')) return 'logos/reddit-icon';
+    if (id.contains('linkedin')) return 'logos/linkedin-icon';
+    if (id.contains('x.com') || id.contains('twitter')) return 'logos/twitter';
+    if (id.contains('gmail')) return 'logos/google-gmail';
+    if (id.contains('calendar')) return 'logos/google-calendar';
+    if (id.contains('microsoft store')) return 'logos/microsoft-icon';
+    if (id.contains('windows terminal') || id.contains('windowsterminal')) {
+      return 'logos/microsoft-windows-icon';
+    }
+    if (id.contains('7-zip') || id.contains('7zip')) {
+      return 'vscode-icons/file-type-zip';
+    }
+    return null;
+  }
+
+  static bool _isActiBindCompanion(String id) =>
+      id.contains('actibind') &&
+      (id.contains('companion') ||
+          id.contains('collector') ||
+          id.contains('pc'));
+}
+
+class _InitialIcon extends StatelessWidget {
+  const _InitialIcon({required this.app, required this.color});
+
+  final _AppSummary app;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = app.appName.trim();
+    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
+    return Center(
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: color,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 }
 
 class _WindowSheet extends StatelessWidget {
