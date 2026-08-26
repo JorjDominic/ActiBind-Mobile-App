@@ -31,6 +31,21 @@ abstract final class NotificationService {
     macOS: DarwinNotificationDetails(),
   );
 
+  static const _breakDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'wellbeing_break_reminders_v1',
+      'Wellbeing break reminders',
+      channelDescription: 'Reminders to take a break after extended app use',
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.reminder,
+      visibility: NotificationVisibility.public,
+      playSound: true,
+      enableVibration: true,
+      ticker: 'ActiBind break reminder',
+    ),
+  );
+
   static bool get _supported =>
       !kIsWeb &&
       {
@@ -75,6 +90,16 @@ abstract final class NotificationService {
           'Activity and routine reminders',
           description: 'Upcoming and finished activities and routines',
           importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
+      await android?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'wellbeing_break_reminders_v1',
+          'Wellbeing break reminders',
+          description: 'Reminders to take a break after extended app use',
+          importance: Importance.high,
           playSound: true,
           enableVibration: true,
         ),
@@ -197,6 +222,27 @@ abstract final class NotificationService {
       title: title,
       body: body,
       notificationDetails: _details,
+    );
+  }
+
+  static Future<void> showBreakReminder({
+    required int id,
+    required String appName,
+    required Duration usage,
+  }) async {
+    if (!_supported) return;
+    await initialize();
+    final hours = usage.inMinutes / 60;
+    final formattedHours = hours == hours.roundToDouble()
+        ? hours.toStringAsFixed(0)
+        : hours.toStringAsFixed(1);
+    await _plugin.show(
+      id: id,
+      title: 'Time for a short break',
+      body:
+          'You have used $appName for $formattedHours hours today. '
+          'Rest your eyes, stretch, and come back when you are ready.',
+      notificationDetails: _breakDetails,
     );
   }
 

@@ -9,9 +9,14 @@ import 'package:actibind/features/home/presentation/pages/screen_time_dashboard_
 import 'package:actibind/features/activities/presentation/widgets/activity_schedule_view.dart';
 import 'package:actibind/features/activities/services/activity_service.dart';
 import 'package:actibind/features/activities/services/activity_validation.dart';
+import 'package:actibind/features/activities/models/app_usage.dart';
+import 'package:actibind/features/activities/services/app_break_reminder_service.dart';
+import 'package:actibind/features/activities/services/usage_stats_service.dart';
 import 'package:actibind/features/routines/services/routine_service.dart';
 import 'package:actibind/features/routines/presentation/routine_view.dart';
 import 'package:actibind/features/insights/services/insight_metrics_service.dart';
+import 'package:actibind/features/notifications/models/app_notification.dart';
+import 'package:actibind/features/notifications/services/app_notification_service.dart';
 import 'package:actibind/shared/widgets/actibind_logo.dart';
 import 'package:actibind/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
@@ -285,9 +290,13 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
           to: today.add(const Duration(days: 7)),
         ),
         InsightMetricsService.load(days: 7),
+        AppNotificationService.getRecent(),
+        _loadMobileBreakWarnings(today, now),
       ]);
       final activities = results[0] as List<dynamic>;
       final metrics = results[1] as dynamic;
+      final inbox = results[2] as List<AppNotification>;
+      final mobileWarnings = results[3] as List<AppUsage>;
       final conflictingIds = <String>{};
       for (var first = 0; first < activities.length; first++) {
         for (var second = first + 1; second < activities.length; second++) {
@@ -316,12 +325,27 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
             goalPercent: (metrics.goalProgress * 100).round() as int,
             upcomingName: upcoming?.name as String?,
             upcomingTime: upcoming?.startsAt as DateTime?,
+            inbox: inbox,
+            mobileWarnings: mobileWarnings,
           ),
         );
+        await AppNotificationService.markAllRead();
       }
     } catch (_) {
       if (mounted) setState(() => _failed = true);
     }
+  }
+
+  Future<List<AppUsage>> _loadMobileBreakWarnings(
+    DateTime start,
+    DateTime end,
+  ) async {
+    if (!UsageStatsService.isSupported ||
+        !await UsageStatsService.hasPermission()) {
+      return const [];
+    }
+    final usage = await UsageStatsService.getUsage(start: start, end: end);
+    return AppBreakReminderService.appsOverThreshold(usage);
   }
 
   @override
@@ -359,6 +383,27 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
               ),
             ),
           if (data != null) ...[
+            for (final warning in data.mobileWarnings) ...[
+              _NotificationTile(
+                icon: Icons.self_improvement_rounded,
+                color: AppColors.coral,
+                title: 'Time for a break from ${warning.appName}',
+                detail:
+                    '${_formatUsage(warning.foreground)} on this phone today. Rest your eyes and stretch.',
+                time: 'Screen-time warning',
+              ),
+              const Divider(height: 1),
+            ],
+            for (final item in data.inbox) ...[
+              _NotificationTile(
+                icon: _inboxIcon(item.type),
+                color: _inboxColor(item.type),
+                title: item.title,
+                detail: item.body,
+                time: _relativeTime(item.createdAt),
+              ),
+              const Divider(height: 1),
+            ],
             if (data.conflictCount > 0) ...[
               _NotificationTile(
                 icon: Icons.warning_amber_rounded,
@@ -393,6 +438,34 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
       ),
     );
   }
+
+  static String _formatUsage(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    return minutes == 0 ? '$hours hours' : '${hours}h ${minutes}m';
+  }
+
+  static IconData _inboxIcon(String type) => switch (type) {
+    'break_warning' => Icons.computer_rounded,
+    'activity' => Icons.event_rounded,
+    'routine' => Icons.repeat_rounded,
+    _ => Icons.notifications_rounded,
+  };
+
+  static Color _inboxColor(String type) => switch (type) {
+    'break_warning' => AppColors.coral,
+    'activity' => AppColors.indigo,
+    'routine' => AppColors.teal,
+    _ => AppColors.amber,
+  };
+
+  static String _relativeTime(DateTime createdAt) {
+    final elapsed = DateTime.now().difference(createdAt);
+    if (elapsed.inMinutes < 1) return 'Just now';
+    if (elapsed.inHours < 1) return '${elapsed.inMinutes}m ago';
+    if (elapsed.inDays < 1) return '${elapsed.inHours}h ago';
+    return '${elapsed.inDays}d ago';
+  }
 }
 
 class _NotificationData {
@@ -401,12 +474,16 @@ class _NotificationData {
     required this.goalPercent,
     this.upcomingName,
     this.upcomingTime,
+    this.inbox = const [],
+    this.mobileWarnings = const [],
   });
 
   final int conflictCount;
   final int goalPercent;
   final String? upcomingName;
   final DateTime? upcomingTime;
+  final List<AppNotification> inbox;
+  final List<AppUsage> mobileWarnings;
 }
 
 class _NotificationTile extends StatelessWidget {

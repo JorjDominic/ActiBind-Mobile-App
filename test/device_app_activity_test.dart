@@ -17,7 +17,7 @@ void main() {
         'last_synced_at': '2026-08-23T12:00:00Z',
       });
 
-      expect(activity.appName, 'Chrome');
+      expect(activity.appName, 'Google Chrome');
       expect(activity.packageName, isEmpty);
       expect(activity.windowTitle, isEmpty);
       expect(activity.totalSeconds, 3720);

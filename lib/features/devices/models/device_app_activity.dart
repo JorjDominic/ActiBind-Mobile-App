@@ -1,3 +1,5 @@
+import 'package:actibind/features/devices/services/app_name_service.dart';
+
 class DeviceAppActivity {
   const DeviceAppActivity({
     required this.id,
@@ -27,7 +29,10 @@ class DeviceAppActivity {
       id: json['id'] as String,
       deviceId: json['device_id'] as String,
       usageDate: DateTime.parse(json['usage_date'] as String),
-      appName: (json['app_name'] as String).trim(),
+      appName: AppNameService.officialName(
+        json['app_name'] as String,
+        json['package_name'] as String? ?? '',
+      ),
       packageName: (json['package_name'] as String? ?? '').trim(),
       windowTitle: (json['window_title'] as String? ?? '').trim(),
       deviceTimezone: (json['device_timezone'] as String? ?? '').trim(),

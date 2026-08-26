@@ -13,6 +13,46 @@ type Reminder = {
   body: string;
 };
 
+const officialAppNames: Record<string, string> = {
+  chrome: "Google Chrome",
+  "google chrome": "Google Chrome",
+  msedge: "Microsoft Edge",
+  "microsoft edge": "Microsoft Edge",
+  firefox: "Mozilla Firefox",
+  brave: "Brave",
+  "brave browser": "Brave",
+  opera: "Opera",
+  "opera gx": "Opera GX",
+  code: "Visual Studio Code",
+  "visual studio code": "Visual Studio Code",
+  devenv: "Microsoft Visual Studio",
+  discord: "Discord",
+  slack: "Slack",
+  teams: "Microsoft Teams",
+  "ms-teams": "Microsoft Teams",
+  spotify: "Spotify",
+  steam: "Steam",
+  epicgameslauncher: "Epic Games Launcher",
+  vlc: "VLC media player",
+  winword: "Microsoft Word",
+  excel: "Microsoft Excel",
+  powerpnt: "Microsoft PowerPoint",
+  outlook: "Microsoft Outlook",
+  onenote: "Microsoft OneNote",
+  notepad: "Notepad",
+  explorer: "File Explorer",
+  photos: "Microsoft Photos",
+  applicationframehost: "Microsoft Store app",
+};
+
+function officialAppName(appName: string, packageName = "") {
+  for (const value of [appName, packageName]) {
+    const normalized = value.trim().replace(/\.exe$/i, "").toLowerCase();
+    if (officialAppNames[normalized]) return officialAppNames[normalized];
+  }
+  return appName.trim().replace(/\.exe$/i, "") || "Unknown app";
+}
+
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -180,6 +220,36 @@ Deno.serve(async (request) => {
       const local = localParts(now, timezone);
       const userIds = [...users];
       if (!userIds.length) continue;
+      const [{ data: pcUsage }, { data: registeredDevices }] = await Promise.all([
+        supabase
+          .from("device_app_activity")
+          .select("id,user_id,device_id,app_name,package_name,total_seconds")
+          .in("user_id", userIds)
+          .eq("usage_date", local.date)
+          .gte("total_seconds", 2 * 60 * 60),
+        supabase
+          .from("registered_devices")
+          .select("id,name")
+          .in("user_id", userIds)
+          .eq("device_type", "pc"),
+      ]);
+      const pcDeviceIds = new Set(
+        (registeredDevices ?? []).map((device) => device.id),
+      );
+      const deviceNames = new Map(
+        (registeredDevices ?? []).map((device) => [device.id, device.name]),
+      );
+      for (const usage of pcUsage ?? []) {
+        if (!pcDeviceIds.has(usage.device_id)) continue;
+        const appName = officialAppName(usage.app_name, usage.package_name ?? "");
+        const deviceName = deviceNames.get(usage.device_id) ?? "your PC";
+        reminders.push({
+          key: `pc-break:${usage.device_id}:${usage.id}:${local.date}:2h`,
+          userId: usage.user_id,
+          title: "Time for a break on your PC",
+          body: `${appName} has been used for at least 2 hours on ${deviceName}. Consider taking a short break.`,
+        });
+      }
       const { data: routines } = await supabase
         .from("routines")
         .select("id,user_id,name,start_time,end_time,active_days,starts_on,ends_on,reminder_minutes")
@@ -226,6 +296,27 @@ Deno.serve(async (request) => {
     }
 
     if (!reminders.length) return response({ checked: true, sent: 0 });
+    const inboxRows = reminders
+      .filter((reminder) => !reminder.key.startsWith("system:"))
+      .map((reminder) => ({
+        user_id: reminder.userId,
+        notification_key: reminder.key,
+        notification_type: reminder.key.startsWith("pc-break:")
+          ? "break_warning"
+          : reminder.key.startsWith("activity:")
+          ? "activity"
+          : reminder.key.startsWith("routine:")
+          ? "routine"
+          : "general",
+        title: reminder.title,
+        body: reminder.body,
+      }));
+    if (inboxRows.length) {
+      const { error: inboxError } = await supabase
+        .from("app_notifications")
+        .upsert(inboxRows, { onConflict: "user_id,notification_key", ignoreDuplicates: true });
+      if (inboxError) console.error("In-app notification sync failed", inboxError.message);
+    }
     const accessToken = await firebaseAccessToken();
     let sent = 0;
     for (const reminder of reminders) {
@@ -251,7 +342,9 @@ Deno.serve(async (request) => {
                 android: {
                   priority: "high",
                   notification: {
-                    channel_id: "schedule_reminders_v3",
+                    channel_id: reminder.key.startsWith("pc-break:")
+                      ? "wellbeing_break_reminders_v1"
+                      : "schedule_reminders_v3",
                     notification_priority: "PRIORITY_MAX",
                     visibility: "PUBLIC",
                     sound: "default",
