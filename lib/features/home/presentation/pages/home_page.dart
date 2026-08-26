@@ -322,7 +322,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
         setState(
           () => _data = _NotificationData(
             conflictCount: conflictingIds.length,
-            goalPercent: (metrics.goalProgress * 100).round() as int,
+            plannedPercent: (metrics.goalProgress * 100).round() as int,
             upcomingName: upcoming?.name as String?,
             upcomingTime: upcoming?.startsAt as DateTime?,
             inbox: inbox,
@@ -417,9 +417,9 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
             _NotificationTile(
               icon: Icons.bar_chart_rounded,
               color: AppColors.teal,
-              title: 'Focus goal progress',
+              title: 'Planned-time share',
               detail:
-                  'You have completed ${data.goalPercent}% of today’s focus goal.',
+                  '${data.plannedPercent}% of today’s recorded device time is covered by elapsed scheduled activity.',
               time: 'Synced now',
             ),
             if (data.upcomingName != null) ...[
@@ -471,7 +471,7 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
 class _NotificationData {
   const _NotificationData({
     required this.conflictCount,
-    required this.goalPercent,
+    required this.plannedPercent,
     this.upcomingName,
     this.upcomingTime,
     this.inbox = const [],
@@ -479,7 +479,7 @@ class _NotificationData {
   });
 
   final int conflictCount;
-  final int goalPercent;
+  final int plannedPercent;
   final String? upcomingName;
   final DateTime? upcomingTime;
   final List<AppNotification> inbox;

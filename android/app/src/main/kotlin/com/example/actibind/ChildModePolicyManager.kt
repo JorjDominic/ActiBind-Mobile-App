@@ -107,10 +107,13 @@ class ChildModePolicyManager(private val activity: Activity) {
         preferences.edit().putStringSet("suspended_packages", suspended.toSet()).apply()
         preferences.edit()
             .putBoolean("personal_mode_active", !managed)
+            .putStringSet("allowed_packages", allowedPackages.toSet())
             .putStringSet(
                 "restricted_packages",
                 if (managed) restrictedPackages.toSet()
-                else (restrictedPackages + homePackage()).filter { it.isNotBlank() }.toSet(),
+                else (restrictedPackages + homePackage() + SYSTEM_UI_PACKAGES)
+                    .filter { it.isNotBlank() }
+                    .toSet(),
             )
             .apply()
 
@@ -180,6 +183,7 @@ class ChildModePolicyManager(private val activity: Activity) {
         preferences.edit().remove("suspended_packages").apply()
         preferences.edit()
             .remove("personal_mode_active")
+            .remove("allowed_packages")
             .remove("restricted_packages")
             .apply()
         try {
@@ -213,5 +217,12 @@ class ChildModePolicyManager(private val activity: Activity) {
     private fun homePackage(): String {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         return activity.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName.orEmpty()
+    }
+
+    private companion object {
+        // Recents/Overview and the notification shade are hosted by System UI on
+        // Android builds. Treating these surfaces as protected closes the common
+        // escape path that does not produce a launcher-package accessibility event.
+        val SYSTEM_UI_PACKAGES = setOf("com.android.systemui")
     }
 }

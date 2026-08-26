@@ -78,7 +78,7 @@ class _ScreenTimeDashboardPageState extends State<ScreenTimeDashboardPage> {
           const AppPageHeader(
             title: 'Insights',
             subtitle:
-                'Long-term patterns and recommendations from your activity',
+                'Combined phone, PC, schedule, routine, and task patterns',
           ),
           const SizedBox(height: 12),
           _AssistantBanner(onTap: () => _showInsightsChat(context)),
@@ -123,9 +123,7 @@ class _ScreenTimeDashboardPageState extends State<ScreenTimeDashboardPage> {
           ),
           const SizedBox(height: 8),
           _CompactMetrics(
-            todayLabel: _metrics?.todayLabel == 'device usage today'
-                ? 'Usage today'
-                : 'Activity today',
+            todayLabel: 'Combined today',
             todayValue: _metrics == null
                 ? '—'
                 : InsightMetricsService.formatDuration(_metrics!.todayValue),
@@ -136,9 +134,11 @@ class _ScreenTimeDashboardPageState extends State<ScreenTimeDashboardPage> {
             progress: _metrics?.goalProgress ?? 0,
           ),
           const SizedBox(height: 14),
+          _DeviceOverview(metrics: _metrics),
+          const SizedBox(height: 14),
           const AppSectionHeader(
-            title: 'Your rhythm',
-            subtitle: 'See when focused activity naturally peaks',
+            title: 'Your activity rhythm',
+            subtitle: 'Recorded device use and scheduled activity by day',
           ),
           const SizedBox(height: 8),
           shad.Card(
@@ -151,17 +151,17 @@ class _ScreenTimeDashboardPageState extends State<ScreenTimeDashboardPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Productive peak hours',
+                    'Busiest scheduled window',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     _metrics == null
-                        ? 'Syncing your focus pattern…'
+                        ? 'Syncing your activity pattern…'
                         : _metrics!.peakWindow ==
-                              'Not enough focus activity yet'
+                              'Not enough scheduled activity yet'
                         ? _metrics!.peakWindow
-                        : 'Your strongest focus window is ${_metrics!.peakWindow}.',
+                        : 'Your schedule is busiest around ${_metrics!.peakWindow}.',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -231,7 +231,7 @@ class _CompactMetrics extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final goalPercent = (progress * 100).round();
+    final plannedPercent = (progress * 100).round();
     return shad.Card(
       filled: true,
       fillColor: colors.surface,
@@ -271,7 +271,7 @@ class _CompactMetrics extends StatelessWidget {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.flag_outlined,
+                    Icons.event_available_rounded,
                     size: 20,
                     color: AppColors.amber,
                   ),
@@ -284,12 +284,12 @@ class _CompactMetrics extends StatelessWidget {
                           children: [
                             const Expanded(
                               child: Text(
-                                'Focus goal',
+                                'Planned-time share',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),
                             Text(
-                              '$goalPercent%',
+                              '$plannedPercent%',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.amber,
@@ -320,6 +320,95 @@ class _CompactMetrics extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeviceOverview extends StatelessWidget {
+  const _DeviceOverview({required this.metrics});
+
+  final InsightMetrics? metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = metrics;
+    return shad.Card(
+      filled: true,
+      fillColor: AppColors.indigo.withValues(alpha: .045),
+      borderColor: AppColors.indigo.withValues(alpha: .16),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Across your devices',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.phone_android_rounded,
+                    label: 'Phone today',
+                    value: data == null
+                        ? '—'
+                        : InsightMetricsService.formatDuration(data.phoneToday),
+                    color: AppColors.indigo,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.computer_rounded,
+                    label: 'PC today',
+                    value: data == null
+                        ? '—'
+                        : InsightMetricsService.formatDuration(data.pcToday),
+                    color: AppColors.teal,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              data == null
+                  ? 'Syncing connected devices…'
+                  : '${data.connectedDeviceCount} connected devices · ${data.overLimitAppCount} apps at or above 2 hours',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (data != null && data.topApps.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text(
+                'Top recorded apps',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              for (final app in data.topApps)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${app.name} · ${app.source}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        InsightMetricsService.formatDuration(app.duration),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -387,7 +476,7 @@ class _AssistantBanner extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     label: 'Chat with the ActiBind insights assistant',
-    hint: 'Ask questions about your activity and focus patterns',
+    hint: 'Ask questions about activity across your phone, PC, and plans',
     child: Material(
       color: AppColors.indigo,
       borderRadius: BorderRadius.circular(20),
@@ -422,7 +511,7 @@ class _AssistantBanner extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Get a quick answer from your activity data',
+                      'Analyze phone, PC, schedules, routines, and tasks',
                       style: TextStyle(color: Color(0xFFE7E7FF), fontSize: 11),
                     ),
                   ],
@@ -594,16 +683,16 @@ class _InsightsChatSheetState extends State<_InsightsChatSheet> {
   final _messages = <_InsightMessage>[
     const _InsightMessage(
       text:
-          'I can help you understand your focus patterns, screen time, and daily goals. What would you like to explore?',
+          'I can analyze your phone and PC usage together with schedules, routines, tasks, and notes. What would you like to explore?',
       isUser: false,
     ),
   ];
   bool _sending = false;
 
   static const _suggestions = [
-    'When do I focus best?',
-    'How can I reduce screen time?',
-    'Summarize my week',
+    'Which apps use most of my time across devices?',
+    'How well does my device use match my schedule?',
+    'Summarize my week across phone and PC',
   ];
 
   @override
@@ -699,7 +788,7 @@ class _InsightsChatSheetState extends State<_InsightsChatSheet> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const Text(
-                      'Uses your ActiBind activity data',
+                      'Phone, PC, schedules, routines, and tasks',
                       style: TextStyle(fontSize: 11, color: AppColors.muted),
                     ),
                   ],
@@ -772,7 +861,7 @@ class _InsightsChatSheetState extends State<_InsightsChatSheet> {
               maxLines: 4,
               decoration: InputDecoration(
                 labelText: 'Ask about your activity',
-                hintText: 'For example, when do I focus best?',
+                hintText: 'For example, compare my phone and PC activity',
                 prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
                 suffixIcon: IconButton(
                   tooltip: 'Send message',

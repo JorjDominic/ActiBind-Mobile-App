@@ -72,7 +72,7 @@ class _HomeOverviewPageState extends State<HomeOverviewPage> {
         children: [
           const AppPageHeader(
             title: 'Overview',
-            subtitle: 'Your focus, routines, and next actions at a glance',
+            subtitle: 'Your devices, plans, routines, and next actions',
           ),
           const SizedBox(height: 16),
           Container(
@@ -120,8 +120,8 @@ class _HomeOverviewPageState extends State<HomeOverviewPage> {
                       const SizedBox(height: 4),
                       Text(
                         _metrics == null
-                            ? 'Syncing your focus goal…'
-                            : 'You’ve completed ${(_metrics!.goalProgress * 100).round()}% of your focus goal.',
+                            ? 'Syncing your planned-time share…'
+                            : '${(_metrics!.goalProgress * 100).round()}% of today’s recorded device time is covered by elapsed plans.',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
@@ -167,20 +167,13 @@ class _HomeOverviewPageState extends State<HomeOverviewPage> {
               children: [
                 Expanded(
                   child: _SummaryTile(
-                    title: 'Focus today',
+                    title: 'Device use today',
                     value: _metrics == null
                         ? '—'
                         : InsightMetricsService.formatDuration(
-                            Duration(
-                              minutes:
-                                  (_metrics!.goalProgress *
-                                          InsightMetricsService
-                                              .dailyFocusGoal
-                                              .inMinutes)
-                                      .round(),
-                            ),
+                            _metrics!.todayValue,
                           ),
-                    subtitle: 'of 6h goal',
+                    subtitle: 'phone + PC',
                     color: AppColors.indigo,
                   ),
                 ),

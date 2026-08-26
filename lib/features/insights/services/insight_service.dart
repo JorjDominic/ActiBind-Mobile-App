@@ -2,6 +2,12 @@ import 'package:actibind/core/services/supabase_service.dart';
 import 'package:actibind/core/services/home_widget_service.dart';
 import 'package:actibind/features/activities/services/activity_service.dart';
 import 'package:actibind/features/activities/services/usage_stats_service.dart';
+import 'package:actibind/features/devices/services/device_app_activity_service.dart';
+import 'package:actibind/features/devices/services/registered_device_service.dart';
+import 'package:actibind/features/family/services/child_profile_service.dart';
+import 'package:actibind/features/notes/services/note_service.dart';
+import 'package:actibind/features/routines/services/routine_service.dart';
+import 'package:actibind/features/todos/services/todo_service.dart';
 import 'package:actibind/features/weather/models/current_weather.dart';
 import 'package:functions_client/functions_client.dart';
 
@@ -113,6 +119,64 @@ class InsightService {
       now.day,
     ).add(const Duration(days: 1));
     final activities = await ActivityService.getActivities(from: from, to: to);
+    final supportingData = await Future.wait([
+      RoutineService.getRoutines(),
+      TodoService.getTodos(),
+      NoteService.getNotes(),
+      RegisteredDeviceService.getDevices(),
+      ChildProfileService.getProfiles(),
+    ]);
+    final routines = supportingData[0] as List<dynamic>;
+    final todos = supportingData[1] as List<dynamic>;
+    final notes = supportingData[2] as List<dynamic>;
+    final devices = supportingData[3] as List<dynamic>;
+    final children = supportingData[4] as List<dynamic>;
+
+    final dates = [
+      for (var offset = 0; offset < 7; offset++)
+        DateTime(from.year, from.month, from.day + offset),
+    ];
+    final occurrenceResults = await Future.wait(
+      dates.map(RoutineService.getOccurrences),
+    );
+    final routineOccurrences = <Map<String, Object?>>[];
+    for (var index = 0; index < dates.length; index++) {
+      for (final occurrence in occurrenceResults[index].values) {
+        routineOccurrences.add({
+          'routine_id': occurrence.routineId,
+          'scheduled_date': occurrence.scheduledDate.toIso8601String(),
+          'status': occurrence.status,
+        });
+      }
+    }
+
+    final pcUsage = <Map<String, Object?>>[];
+    for (final device in devices.where((item) => item.isPc == true)) {
+      try {
+        final rows = await DeviceAppActivityService.getForDevice(
+          deviceId: device.id as String,
+          start: from,
+          end: now,
+        );
+        pcUsage.addAll(
+          rows
+              .take(50)
+              .map(
+                (item) => {
+                  'device_id': device.id,
+                  'device_name': device.name,
+                  'app': item.appName,
+                  'executable': item.packageName,
+                  'usage_date': item.usageDate.toIso8601String(),
+                  'foreground_minutes': item.totalSeconds ~/ 60,
+                  'last_synced_at': item.lastSyncedAt.toIso8601String(),
+                },
+              ),
+        );
+      } catch (_) {
+        // Other synchronized sources remain available if one device is stale.
+      }
+    }
 
     var usage = const <Map<String, Object>>[];
     if (includeUsage && UsageStatsService.isSupported) {
@@ -156,6 +220,68 @@ class InsightService {
               )
               .toList(growable: false),
           'usage': usage,
+          'pc_usage': pcUsage,
+          'devices': devices
+              .map(
+                (item) => {
+                  'id': item.id,
+                  'name': item.name,
+                  'type': item.type,
+                  'platform': item.platform,
+                  'connected': item.connected,
+                  'last_seen_at': item.lastSeenAt?.toIso8601String(),
+                },
+              )
+              .toList(growable: false),
+          'routines': routines
+              .map(
+                (item) => {
+                  'id': item.id,
+                  'name': item.name,
+                  'category': item.category,
+                  'start_minutes': item.startMinutes,
+                  'end_minutes': item.endMinutes,
+                  'active_days': item.activeDays.toList()..sort(),
+                  'active': item.active,
+                  'monitor_usage': item.monitorUsage,
+                },
+              )
+              .toList(growable: false),
+          'routine_occurrences': routineOccurrences,
+          'todos': todos
+              .map(
+                (item) => {
+                  'title': item.title,
+                  'priority': item.priority,
+                  'completed': item.completed,
+                  'due_date': item.dueDate?.toIso8601String(),
+                  'completed_at': item.completedAt?.toIso8601String(),
+                  'notes': item.notes,
+                },
+              )
+              .toList(growable: false),
+          'notes': notes
+              .take(30)
+              .map(
+                (item) => {
+                  'title': item.title,
+                  'content': item.content,
+                  'created_at': item.createdAt.toIso8601String(),
+                },
+              )
+              .toList(growable: false),
+          'family_profiles': children
+              .map(
+                (item) => {
+                  'name': item.name,
+                  'age_range': item.ageRange,
+                  'device': item.device,
+                  'connected': item.connected,
+                  'restrictions_active': item.restrictionsActive,
+                  'screen_time_minutes': item.screenTimeMinutes,
+                },
+              )
+              .toList(growable: false),
           'history': history
               .where(
                 (item) =>

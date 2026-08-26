@@ -88,6 +88,17 @@ Deno.serve(async (request) => {
 
     const activities = Array.isArray(body.activities) ? body.activities.slice(0, 100) : [];
     const usage = Array.isArray(body.usage) ? body.usage.slice(0, 20) : [];
+    const pcUsage = Array.isArray(body.pc_usage) ? body.pc_usage.slice(0, 200) : [];
+    const devices = Array.isArray(body.devices) ? body.devices.slice(0, 30) : [];
+    const routines = Array.isArray(body.routines) ? body.routines.slice(0, 100) : [];
+    const routineOccurrences = Array.isArray(body.routine_occurrences)
+      ? body.routine_occurrences.slice(0, 200)
+      : [];
+    const todos = Array.isArray(body.todos) ? body.todos.slice(0, 150) : [];
+    const notes = Array.isArray(body.notes) ? body.notes.slice(0, 30) : [];
+    const familyProfiles = Array.isArray(body.family_profiles)
+      ? body.family_profiles.slice(0, 20)
+      : [];
     const history: ChatMessage[] = Array.isArray(body.history)
       ? body.history
           .filter((item: ChatMessage) =>
@@ -100,24 +111,47 @@ Deno.serve(async (request) => {
 
     const system = [
       "You are ActiBind's activity insights assistant.",
-      "Use only the supplied schedule and device-usage context; never invent statistics.",
+      "Use only the supplied context; never invent statistics.",
+      "Analyze phone and PC usage together, while clearly distinguishing device sources and date ranges.",
+      "Phone usage is a current-day snapshot only. Never copy or infer it into earlier dates. PC rows contain their own usage_date and may be compared by date.",
+      "Use schedules, routines and their completion states, tasks, notes, connected-device status, and family profiles when relevant.",
+      "Prefer meaningful relationships across sources over generic productivity or focus advice.",
+      "Design every response for a narrow mobile screen: never use Markdown tables, ASCII tables, columns, or raw data dumps.",
+      "Start with one direct takeaway, then use at most four short bullet points only when they improve clarity. Each bullet must contain one idea.",
+      "Mention no more than five app names unless the user explicitly asks for a longer list.",
+      "Summarize evidence instead of repeating every supplied record.",
       "If data is insufficient, say so briefly and still offer a practical suggestion.",
       "Do not provide medical diagnoses. Be concise, supportive, and specific.",
       mode === "weather"
         ? "Use the supplied weather and schedule together. Return one practical sentence under 35 words. Do not invent a forecast or claim that current observations predict future conditions."
         : mode === "home"
         ? "Return at most two short sentences."
-        : "Return at most 120 words.",
+        : mode === "chat"
+        ? "Return at most 160 words, using short paragraphs suitable for a phone."
+        : "Return at most 100 words, using short paragraphs suitable for a phone.",
     ].join(" ");
     const context = JSON.stringify({
       local_time: body.local_time,
       timezone: body.timezone,
       recent_activities: activities,
-      device_usage_today: usage,
+      phone_usage_today: usage,
+      pc_usage_by_day: pcUsage,
+      registered_devices: devices,
+      routines,
+      routine_occurrences: routineOccurrences,
+      tasks: todos,
+      notes,
+      family_profiles: familyProfiles,
       weather: body.weather,
     });
 
-    const maxCompletionTokens = mode === "weather" ? 384 : mode === "home" ? 512 : 1024;
+    const maxCompletionTokens = mode === "weather"
+      ? 256
+      : mode === "home"
+      ? 384
+      : mode === "chat"
+      ? 640
+      : 480;
     const messages = [
       { role: "system", content: system },
       { role: "system", content: `User context: ${context}` },

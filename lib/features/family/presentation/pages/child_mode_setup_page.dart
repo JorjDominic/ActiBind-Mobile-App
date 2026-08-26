@@ -770,6 +770,7 @@ class _ActiveChildModePageState extends State<ActiveChildModePage> {
     if (_finishing) return;
     _finishing = true;
     _timer?.cancel();
+    _timer = null;
     final session = _session;
     if (session != null && session.childId != null) {
       final elapsedSeconds = DateTime.now()
@@ -782,7 +783,20 @@ class _ActiveChildModePageState extends State<ActiveChildModePage> {
         // Ending the protected session must still work while offline.
       }
     }
-    await widget.policyService.stopChildMode();
+    final result = await widget.policyService.stopChildMode();
+    if (!result.applied) {
+      _finishing = false;
+      if (mounted) {
+        _timer ??= Timer.periodic(
+          const Duration(seconds: 1),
+          (_) => _updateRemaining(),
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result.message)));
+      }
+      return;
+    }
     await ChildModeSessionService.clear();
     if (!mounted) return;
     if (widget.onEnded case final onEnded?) {
