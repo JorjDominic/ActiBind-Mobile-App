@@ -33,4 +33,20 @@ void main() {
       ['at.limit', 'over.limit'],
     );
   });
+
+  test('maps app usage to milestones from two through eight hours', () {
+    expect(
+      AppBreakReminderService.milestoneFor(const Duration(minutes: 119)),
+      isNull,
+    );
+    expect(AppBreakReminderService.milestoneFor(const Duration(hours: 2)), 2);
+    expect(
+      AppBreakReminderService.milestoneFor(
+        const Duration(hours: 5, minutes: 59),
+      ),
+      5,
+    );
+    expect(AppBreakReminderService.milestoneFor(const Duration(hours: 8)), 8);
+    expect(AppBreakReminderService.milestoneFor(const Duration(hours: 12)), 8);
+  });
 }

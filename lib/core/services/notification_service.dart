@@ -229,6 +229,7 @@ abstract final class NotificationService {
     required int id,
     required String appName,
     required Duration usage,
+    required int milestoneHours,
   }) async {
     if (!_supported) return;
     await initialize();
@@ -238,9 +239,9 @@ abstract final class NotificationService {
         : hours.toStringAsFixed(1);
     await _plugin.show(
       id: id,
-      title: 'Time for a short break',
+      title: '$milestoneHours-hour app milestone',
       body:
-          'You have used $appName for $formattedHours hours today. '
+          'Phone activity: You have used $appName for $formattedHours hours today. '
           'Rest your eyes, stretch, and come back when you are ready.',
       notificationDetails: _breakDetails,
     );

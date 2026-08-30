@@ -15,6 +15,12 @@ abstract final class AppBreakReminderService {
     Duration limit = threshold,
   }) => usage.where((app) => app.foreground >= limit).toList(growable: false);
 
+  static int? milestoneFor(Duration usage) {
+    final hours = usage.inHours;
+    if (hours < 2) return null;
+    return hours.clamp(2, 8);
+  }
+
   static Future<void> checkNow() async {
     if (_checking || !UsageStatsService.isSupported) return;
     final notificationPrefs = NotificationPreferencesController.instance;
@@ -36,13 +42,16 @@ abstract final class AppBreakReminderService {
       final day = _dayKey(now);
 
       for (final app in appsOverThreshold(usage)) {
-        final key = '$_preferencePrefix.$day.${app.packageName}';
+        final milestone = milestoneFor(app.foreground);
+        if (milestone == null) continue;
+        final key = '$_preferencePrefix.$day.${app.packageName}.${milestone}h';
         if (preferences.getBool(key) == true) continue;
 
         await NotificationService.showBreakReminder(
-          id: _notificationId(day, app.packageName),
+          id: _notificationId(day, app.packageName, milestone),
           appName: app.appName,
           usage: app.foreground,
+          milestoneHours: milestone,
         );
         await preferences.setBool(key, true);
       }
@@ -68,8 +77,9 @@ abstract final class AppBreakReminderService {
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
-  static int _notificationId(String day, String packageName) =>
-      300000000 + Object.hash(day, packageName).abs().remainder(600000000);
+  static int _notificationId(String day, String packageName, int milestone) =>
+      300000000 +
+      Object.hash(day, packageName, milestone).abs().remainder(600000000);
 
   static Future<void> _removeOldKeys(
     SharedPreferences preferences, {

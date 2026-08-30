@@ -242,13 +242,15 @@ Deno.serve(async (request) => {
       );
       for (const usage of pcUsage ?? []) {
         if (!pcDeviceIds.has(usage.device_id)) continue;
+        const milestone = Math.min(8, Math.floor(usage.total_seconds / 3600));
+        if (milestone < 2) continue;
         const appName = officialAppName(usage.app_name, usage.package_name ?? "");
         const deviceName = deviceNames.get(usage.device_id) ?? "your PC";
         reminders.push({
-          key: `pc-break:${usage.device_id}:${usage.id}:${local.date}:2h`,
+          key: `pc-break:${usage.device_id}:${usage.id}:${local.date}:${milestone}h`,
           userId: usage.user_id,
-          title: "Time for a break on your PC",
-          body: `PC/Laptop activity on ${deviceName}: ${appName} has been used for at least 2 hours. Consider taking a short break.`,
+          title: `${milestone}-hour app milestone`,
+          body: `PC/Laptop activity on ${deviceName}: ${appName} has reached ${milestone} hours today. Consider taking a short break.`,
         });
       }
       const { data: routines } = await supabase
