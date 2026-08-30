@@ -1,6 +1,7 @@
 import 'package:actibind/core/services/supabase_service.dart';
 import 'package:actibind/core/services/home_widget_service.dart';
 import 'package:actibind/features/activities/services/activity_service.dart';
+import 'package:actibind/features/activities/services/holiday_service.dart';
 import 'package:actibind/features/activities/services/usage_stats_service.dart';
 import 'package:actibind/features/devices/services/device_app_activity_service.dart';
 import 'package:actibind/features/devices/services/registered_device_service.dart';
@@ -9,6 +10,7 @@ import 'package:actibind/features/notes/services/note_service.dart';
 import 'package:actibind/features/routines/services/routine_service.dart';
 import 'package:actibind/features/todos/services/todo_service.dart';
 import 'package:actibind/features/weather/models/current_weather.dart';
+import 'package:actibind/features/weather/services/weather_service.dart';
 import 'package:functions_client/functions_client.dart';
 
 class InsightChatMessage {
@@ -132,6 +134,24 @@ class InsightService {
     final devices = supportingData[3] as List<dynamic>;
     final children = supportingData[4] as List<dynamic>;
 
+    CurrentWeather? currentWeather;
+    var holidays = const <dynamic>[];
+    try {
+      currentWeather = await WeatherService.getCurrentWeather(
+        latitude: 14.5995,
+        longitude: 120.9842,
+      );
+    } catch (_) {}
+    try {
+      final holidayLists = await Future.wait(
+        {
+          from.year,
+          to.year,
+        }.map((year) => HolidayService.getHolidays(year: year)),
+      );
+      holidays = holidayLists.expand((items) => items).toList(growable: false);
+    } catch (_) {}
+
     final dates = [
       for (var offset = 0; offset < 7; offset++)
         DateTime(from.year, from.month, from.day + offset),
@@ -151,27 +171,44 @@ class InsightService {
     }
 
     final pcUsage = <Map<String, Object?>>[];
+    final pcWindowActivity = <Map<String, Object?>>[];
     for (final device in devices.where((item) => item.isPc == true)) {
       try {
-        final rows = await DeviceAppActivityService.getForDevice(
-          deviceId: device.id as String,
-          start: from,
-          end: now,
-        );
+        final results = await Future.wait([
+          DeviceAppActivityService.getForDevice(
+            deviceId: device.id as String,
+            start: from,
+            end: now,
+          ),
+          DeviceAppActivityService.getWindowActivityForDevice(
+            deviceId: device.id as String,
+            start: from,
+            end: now,
+          ),
+        ]);
+        final rows = results[0] as List<dynamic>;
         pcUsage.addAll(
-          rows
-              .take(50)
-              .map(
-                (item) => {
-                  'device_id': device.id,
-                  'device_name': device.name,
-                  'app': item.appName,
-                  'executable': item.packageName,
-                  'usage_date': item.usageDate.toIso8601String(),
-                  'foreground_minutes': item.totalSeconds ~/ 60,
-                  'last_synced_at': item.lastSyncedAt.toIso8601String(),
-                },
-              ),
+          rows.map(
+            (item) => {
+              'device_id': device.id,
+              'device_name': device.name,
+              'app': item.appName,
+              'executable': item.packageName,
+              'usage_date': item.usageDate.toIso8601String(),
+              'foreground_minutes': item.totalSeconds ~/ 60,
+              'last_synced_at': item.lastSyncedAt.toIso8601String(),
+            },
+          ),
+        );
+        final windows = results[1] as List<Map<String, Object?>>;
+        pcWindowActivity.addAll(
+          windows.map(
+            (item) => {
+              'device_id': device.id,
+              'device_name': device.name,
+              ...item,
+            },
+          ),
         );
       } catch (_) {
         // Other synchronized sources remain available if one device is stale.
@@ -182,16 +219,13 @@ class InsightService {
     if (includeUsage && UsageStatsService.isSupported) {
       try {
         if (await UsageStatsService.hasPermission()) {
-          final rows = await UsageStatsService.getUsage(
-            start: DateTime(now.year, now.month, now.day),
-            end: now,
-          );
+          final rows = await UsageStatsService.getUsage(start: from, end: now);
           usage = rows
-              .take(10)
               .map<Map<String, Object>>(
                 (item) => {
                   'app': item.appName,
                   'foreground_minutes': item.foreground.inMinutes,
+                  'last_used_at': item.lastTimeUsed.toIso8601String(),
                 },
               )
               .toList(growable: false);
@@ -221,6 +255,7 @@ class InsightService {
               .toList(growable: false),
           'usage': usage,
           'pc_usage': pcUsage,
+          'pc_window_activity': pcWindowActivity,
           'devices': devices
               .map(
                 (item) => {
@@ -293,6 +328,28 @@ class InsightService {
               .toList(growable: false),
           'timezone': now.timeZoneName,
           'local_time': now.toIso8601String(),
+          'weather': currentWeather == null
+              ? null
+              : {
+                  'location': 'Manila fallback',
+                  'temperature_c': currentWeather.temperature,
+                  'apparent_temperature_c': currentWeather.apparentTemperature,
+                  'humidity_percent': currentWeather.humidity,
+                  'wind_kmh': currentWeather.windSpeed,
+                  'weather_code': currentWeather.weatherCode,
+                  'is_day': currentWeather.isDay,
+                  'observed_at': currentWeather.observedAt.toIso8601String(),
+                },
+          'holidays': holidays
+              .map(
+                (item) => {
+                  'date': item.date.toIso8601String(),
+                  'name': item.name,
+                  'national': item.nationalHoliday,
+                  'types': item.types,
+                },
+              )
+              .toList(growable: false),
           ...extraContext,
         },
       );

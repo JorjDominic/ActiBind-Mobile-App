@@ -67,10 +67,21 @@ abstract final class PushNotificationService {
   }
 
   static Future<void> _showForegroundMessage(RemoteMessage message) async {
+    await _showDataMessage(message);
+  }
+
+  static Future<void> handleBackgroundMessage(RemoteMessage message) async {
+    // Android displays notification payloads itself while the app is closed.
+    if (message.notification != null) return;
+    await _showDataMessage(message);
+  }
+
+  static Future<void> _showDataMessage(RemoteMessage message) async {
     final notification = message.notification;
     final title = notification?.title ?? message.data['title'] as String?;
     final body = notification?.body ?? message.data['body'] as String?;
     if (title == null || body == null) return;
+    await NotificationService.initialize();
     await NotificationService.showPush(
       id:
           message.messageId?.hashCode ??

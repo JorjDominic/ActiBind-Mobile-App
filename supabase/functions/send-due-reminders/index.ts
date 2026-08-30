@@ -247,7 +247,7 @@ Deno.serve(async (request) => {
           key: `pc-break:${usage.device_id}:${usage.id}:${local.date}:2h`,
           userId: usage.user_id,
           title: "Time for a break on your PC",
-          body: `${appName} has been used for at least 2 hours on ${deviceName}. Consider taking a short break.`,
+          body: `PC/Laptop activity on ${deviceName}: ${appName} has been used for at least 2 hours. Consider taking a short break.`,
         });
       }
       const { data: routines } = await supabase
@@ -339,8 +339,17 @@ Deno.serve(async (request) => {
               message: {
                 token: device.token,
                 notification: { title: reminder.title, body: reminder.body },
+                data: {
+                  title: reminder.title,
+                  body: reminder.body,
+                  notification_key: reminder.key,
+                  type: reminder.key.split(":", 1)[0],
+                  sent_at: now.toISOString(),
+                },
                 android: {
                   priority: "high",
+                  ttl: "86400s",
+                  collapse_key: reminder.key,
                   notification: {
                     channel_id: reminder.key.startsWith("pc-break:")
                       ? "wellbeing_break_reminders_v1"

@@ -257,7 +257,11 @@ class _NotificationsButton extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
-      builder: (context) => const _NotificationsSheet(),
+      isScrollControlled: true,
+      builder: (context) => const FractionallySizedBox(
+        heightFactor: .88,
+        child: _NotificationsSheet(),
+      ),
     );
   }
 }
@@ -374,66 +378,79 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
           ),
           const SizedBox(height: 8),
           if (data == null && !_failed) const LinearProgressIndicator(),
-          if (_failed)
-            ListTile(
-              title: const Text('Could not sync notifications'),
-              trailing: TextButton(
-                onPressed: _load,
-                child: const Text('Retry'),
-              ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                if (_failed)
+                  ListTile(
+                    title: const Text('Could not sync notifications'),
+                    trailing: TextButton(
+                      onPressed: _load,
+                      child: const Text('Retry'),
+                    ),
+                  ),
+                if (data != null) ...[
+                  for (final warning in data.mobileWarnings) ...[
+                    _NotificationTile(
+                      icon: Icons.self_improvement_rounded,
+                      color: AppColors.coral,
+                      title: 'Time for a break from ${warning.appName}',
+                      detail:
+                          '${_formatUsage(warning.foreground)} on this phone today. Rest your eyes and stretch.',
+                      source: 'Phone activity',
+                      time: _sentTime(warning.lastTimeUsed, context),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                  for (final item in data.inbox) ...[
+                    _NotificationTile(
+                      icon: _inboxIcon(item.type),
+                      color: _inboxColor(item.type),
+                      title: item.title,
+                      detail: item.body,
+                      source: _inboxSource(item.type),
+                      time: _sentTime(item.createdAt, context),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                  if (data.conflictCount > 0) ...[
+                    _NotificationTile(
+                      icon: Icons.warning_amber_rounded,
+                      color: AppColors.amber,
+                      title: '${data.conflictCount} conflicting activities',
+                      detail:
+                          'Open Activity to review the overlapping schedules.',
+                      source: 'Schedule',
+                      time: 'Current schedule',
+                    ),
+                    const Divider(height: 1),
+                  ],
+                  _NotificationTile(
+                    icon: Icons.bar_chart_rounded,
+                    color: AppColors.teal,
+                    title: 'Planned-time share',
+                    detail:
+                        '${data.plannedPercent}% of today’s recorded device time is covered by elapsed scheduled activity.',
+                    source: 'All devices',
+                    time: 'Synced now',
+                  ),
+                  if (data.upcomingName != null) ...[
+                    const Divider(height: 1),
+                    _NotificationTile(
+                      icon: Icons.schedule_rounded,
+                      color: AppColors.indigo,
+                      title: '${data.upcomingName} is next',
+                      detail:
+                          'Starts at ${TimeOfDay.fromDateTime(data.upcomingTime!).format(context)}.',
+                      source: 'Schedule',
+                      time: 'Upcoming',
+                    ),
+                  ],
+                ],
+              ],
             ),
-          if (data != null) ...[
-            for (final warning in data.mobileWarnings) ...[
-              _NotificationTile(
-                icon: Icons.self_improvement_rounded,
-                color: AppColors.coral,
-                title: 'Time for a break from ${warning.appName}',
-                detail:
-                    '${_formatUsage(warning.foreground)} on this phone today. Rest your eyes and stretch.',
-                time: 'Screen-time warning',
-              ),
-              const Divider(height: 1),
-            ],
-            for (final item in data.inbox) ...[
-              _NotificationTile(
-                icon: _inboxIcon(item.type),
-                color: _inboxColor(item.type),
-                title: item.title,
-                detail: item.body,
-                time: _relativeTime(item.createdAt),
-              ),
-              const Divider(height: 1),
-            ],
-            if (data.conflictCount > 0) ...[
-              _NotificationTile(
-                icon: Icons.warning_amber_rounded,
-                color: AppColors.amber,
-                title: '${data.conflictCount} conflicting activities',
-                detail: 'Open Activity to review the overlapping schedules.',
-                time: 'Current schedule',
-              ),
-              const Divider(height: 1),
-            ],
-            _NotificationTile(
-              icon: Icons.bar_chart_rounded,
-              color: AppColors.teal,
-              title: 'Planned-time share',
-              detail:
-                  '${data.plannedPercent}% of today’s recorded device time is covered by elapsed scheduled activity.',
-              time: 'Synced now',
-            ),
-            if (data.upcomingName != null) ...[
-              const Divider(height: 1),
-              _NotificationTile(
-                icon: Icons.schedule_rounded,
-                color: AppColors.indigo,
-                title: '${data.upcomingName} is next',
-                detail:
-                    'Starts at ${TimeOfDay.fromDateTime(data.upcomingTime!).format(context)}.',
-                time: 'Upcoming',
-              ),
-            ],
-          ],
+          ),
         ],
       ),
     );
@@ -458,6 +475,17 @@ class _NotificationsSheetState extends State<_NotificationsSheet> {
     'routine' => AppColors.teal,
     _ => AppColors.amber,
   };
+
+  static String _inboxSource(String type) => switch (type) {
+    'break_warning' => 'PC/Laptop activity',
+    'activity' || 'routine' => 'Schedule',
+    _ => 'ActiBind',
+  };
+
+  static String _sentTime(DateTime sentAt, BuildContext context) {
+    final clock = TimeOfDay.fromDateTime(sentAt).format(context);
+    return 'Sent $clock · ${_relativeTime(sentAt)}';
+  }
 
   static String _relativeTime(DateTime createdAt) {
     final elapsed = DateTime.now().difference(createdAt);
@@ -492,6 +520,7 @@ class _NotificationTile extends StatelessWidget {
     required this.color,
     required this.title,
     required this.detail,
+    required this.source,
     required this.time,
   });
 
@@ -499,6 +528,7 @@ class _NotificationTile extends StatelessWidget {
   final Color color;
   final String title;
   final String detail;
+  final String source;
   final String time;
 
   @override
@@ -528,6 +558,15 @@ class _NotificationTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
+                  source,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
                   detail,
                   style: TextStyle(
                     fontSize: 12,
@@ -538,9 +577,12 @@ class _NotificationTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            time,
-            style: const TextStyle(fontSize: 10, color: AppColors.muted),
+          Flexible(
+            child: Text(
+              time,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 10, color: AppColors.muted),
+            ),
           ),
         ],
       ),

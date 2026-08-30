@@ -89,6 +89,9 @@ Deno.serve(async (request) => {
     const activities = Array.isArray(body.activities) ? body.activities.slice(0, 100) : [];
     const usage = Array.isArray(body.usage) ? body.usage.slice(0, 20) : [];
     const pcUsage = Array.isArray(body.pc_usage) ? body.pc_usage.slice(0, 200) : [];
+    const pcWindowActivity = Array.isArray(body.pc_window_activity)
+      ? body.pc_window_activity.slice(0, 500)
+      : [];
     const devices = Array.isArray(body.devices) ? body.devices.slice(0, 30) : [];
     const routines = Array.isArray(body.routines) ? body.routines.slice(0, 100) : [];
     const routineOccurrences = Array.isArray(body.routine_occurrences)
@@ -99,6 +102,7 @@ Deno.serve(async (request) => {
     const familyProfiles = Array.isArray(body.family_profiles)
       ? body.family_profiles.slice(0, 20)
       : [];
+    const holidays = Array.isArray(body.holidays) ? body.holidays.slice(0, 80) : [];
     const history: ChatMessage[] = Array.isArray(body.history)
       ? body.history
           .filter((item: ChatMessage) =>
@@ -113,13 +117,16 @@ Deno.serve(async (request) => {
       "You are ActiBind's activity insights assistant.",
       "Use only the supplied context; never invent statistics.",
       "Analyze phone and PC usage together, while clearly distinguishing device sources and date ranges.",
-      "Phone usage is a current-day snapshot only. Never copy or infer it into earlier dates. PC rows contain their own usage_date and may be compared by date.",
-      "Use schedules, routines and their completion states, tasks, notes, connected-device status, and family profiles when relevant.",
+      "Treat every supplied timestamp and date range precisely. Do not attribute usage to a specific day unless its data supports that attribution.",
+      "Use schedules, routines and completion states, tasks, notes, all phone and PC activity, device status, family profiles, current weather, and holidays when relevant.",
+      "Cross-check sources before answering. Identify patterns, conflicts, unusually high or low activity, overdue work, gaps, device freshness, weather constraints, and holiday effects when supported.",
+      "PC window activity contains browser tab/window titles. Use it to explain Chrome websites or tabs when relevant, while treating titles as sensitive and never inventing a URL or site that is not supplied.",
+      "Answer the user's actual question first, then give the most useful evidence and concrete next actions. Explain uncertainty and stale or missing data explicitly.",
       "Prefer meaningful relationships across sources over generic productivity or focus advice.",
       "Design every response for a narrow mobile screen: never use Markdown tables, ASCII tables, columns, or raw data dumps.",
       "Start with one direct takeaway, then use at most four short bullet points only when they improve clarity. Each bullet must contain one idea.",
       "Mention no more than five app names unless the user explicitly asks for a longer list.",
-      "Summarize evidence instead of repeating every supplied record.",
+      "Be comprehensive when analysis is requested, but group related records into findings instead of dumping raw data.",
       "If data is insufficient, say so briefly and still offer a practical suggestion.",
       "Do not provide medical diagnoses. Be concise, supportive, and specific.",
       mode === "weather"
@@ -127,8 +134,8 @@ Deno.serve(async (request) => {
         : mode === "home"
         ? "Return at most two short sentences."
         : mode === "chat"
-        ? "Return at most 160 words, using short paragraphs suitable for a phone."
-        : "Return at most 100 words, using short paragraphs suitable for a phone.",
+        ? "Use up to 450 words when the evidence warrants it, with short sections and bullets suitable for a phone."
+        : "Use up to 250 words when useful, with short paragraphs suitable for a phone.",
     ].join(" ");
     const context = JSON.stringify({
       local_time: body.local_time,
@@ -136,6 +143,7 @@ Deno.serve(async (request) => {
       recent_activities: activities,
       phone_usage_today: usage,
       pc_usage_by_day: pcUsage,
+      pc_window_and_browser_tab_activity: pcWindowActivity,
       registered_devices: devices,
       routines,
       routine_occurrences: routineOccurrences,
@@ -143,6 +151,7 @@ Deno.serve(async (request) => {
       notes,
       family_profiles: familyProfiles,
       weather: body.weather,
+      public_holidays: holidays,
     });
 
     const maxCompletionTokens = mode === "weather"
@@ -150,8 +159,8 @@ Deno.serve(async (request) => {
       : mode === "home"
       ? 384
       : mode === "chat"
-      ? 640
-      : 480;
+      ? 1400
+      : 900;
     const messages = [
       { role: "system", content: system },
       { role: "system", content: `User context: ${context}` },
