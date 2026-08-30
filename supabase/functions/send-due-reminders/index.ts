@@ -167,10 +167,11 @@ Deno.serve(async (request) => {
     const upperStart = new Date(now.getTime() + 61 * 60_000).toISOString();
     const lowerEnd = new Date(now.getTime() - 60_000).toISOString();
     const upperEnd = new Date(now.getTime() + 60_000).toISOString();
-    const [{ data: tokens, error: tokenError }, { data: starting }, { data: ending }] = await Promise.all([
+    const [{ data: tokens, error: tokenError }, { data: starting }, { data: ending }, { data: preferenceRows }] = await Promise.all([
       supabase.from("device_push_tokens").select("token,user_id,timezone"),
       supabase.from("activities").select("id,user_id,name,starts_at,reminder_minutes").gte("starts_at", lowerStart).lt("starts_at", upperStart),
       supabase.from("activities").select("id,user_id,name,ends_at").gte("ends_at", lowerEnd).lt("ends_at", upperEnd),
+      supabase.from("notification_preferences").select("*"),
     ]);
     if (tokenError) throw tokenError;
     const tokenRows = (tokens ?? []) as TokenRow[];
@@ -295,6 +296,26 @@ Deno.serve(async (request) => {
       }
     }
 
+    const preferences = new Map((preferenceRows ?? []).map((item) => [item.user_id, item]));
+    const userTimezone = new Map(tokenRows.map((item) => [item.user_id, item.timezone]));
+    const enabledReminders = reminders.filter((reminder) => {
+      const preference = preferences.get(reminder.userId);
+      if (!preference) return true;
+      if (reminder.key.startsWith("activity:") && !preference.activity_reminders) return false;
+      if (reminder.key.startsWith("routine:") && !preference.routine_reminders) return false;
+      if (reminder.key.startsWith("pc-break:") && !preference.pc_breaks) return false;
+      if (preference.quiet_hours && !reminder.key.startsWith("system:")) {
+        const local = localParts(now, userTimezone.get(reminder.userId) ?? "UTC");
+        const hour = Math.floor(local.minute / 60);
+        const start = preference.quiet_start_hour;
+        const end = preference.quiet_end_hour;
+        const quiet = start > end ? hour >= start || hour < end : hour >= start && hour < end;
+        if (quiet) return false;
+      }
+      return true;
+    });
+    reminders.length = 0;
+    reminders.push(...enabledReminders);
     if (!reminders.length) return response({ checked: true, sent: 0 });
     const inboxRows = reminders
       .filter((reminder) => !reminder.key.startsWith("system:"))

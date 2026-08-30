@@ -611,6 +611,32 @@ class _AppNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < 400) {
+      return Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 56,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                for (final item in _items)
+                  IconButton(
+                    tooltip: item.title,
+                    onPressed: () => onSelected(item),
+                    icon: Icon(
+                      item.icon,
+                      size: 22,
+                      color: selected == item ? item.color : AppColors.muted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return shad.NavigationBar(
       key: ValueKey(familyModeEnabled),
       direction: Axis.horizontal,
@@ -620,7 +646,7 @@ class _AppNavigation extends StatelessWidget {
       labelType: shad.NavigationLabelType.none,
       selectedKey: ValueKey(selected),
       onSelected: (key) => onSelected((key as ValueKey<_Destination>).value),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       children: [
         for (final item in _items)
           shad.NavigationItem(
@@ -631,8 +657,8 @@ class _AppNavigation extends StatelessWidget {
             ),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              width: 34,
-              height: 34,
+              width: MediaQuery.sizeOf(context).width < 400 ? 28 : 34,
+              height: MediaQuery.sizeOf(context).width < 400 ? 28 : 34,
               decoration: BoxDecoration(
                 color: selected == item
                     ? item.color.withValues(alpha: .14)
@@ -641,7 +667,7 @@ class _AppNavigation extends StatelessWidget {
               ),
               child: Icon(
                 item.icon,
-                size: 24,
+                size: MediaQuery.sizeOf(context).width < 400 ? 20 : 24,
                 color: selected == item ? item.color : AppColors.muted,
               ),
             ),

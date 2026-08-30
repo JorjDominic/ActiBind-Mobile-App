@@ -152,6 +152,7 @@ Deno.serve(async (request) => {
       family_profiles: familyProfiles,
       weather: body.weather,
       public_holidays: holidays,
+      user_selected_data_sources: body.privacy_selection,
     });
 
     const maxCompletionTokens = mode === "weather"

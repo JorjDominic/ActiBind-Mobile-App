@@ -2,8 +2,11 @@ import 'package:actibind/core/constants/app_constants.dart';
 import 'package:actibind/core/settings/family_mode_controller.dart';
 import 'package:actibind/core/settings/developer_mode_controller.dart';
 import 'package:actibind/core/settings/daily_summary_controller.dart';
+import 'package:actibind/core/settings/notification_preferences_controller.dart';
+import 'package:actibind/core/settings/privacy_controller.dart';
 import 'package:actibind/core/services/supabase_service.dart';
 import 'package:actibind/features/auth/services/auth_service.dart';
+import 'package:actibind/features/account/services/account_data_service.dart';
 import 'package:actibind/core/theme/app_colors.dart';
 import 'package:actibind/core/theme/theme_controller.dart';
 import 'package:actibind/features/developer/presentation/developer_diagnostics_page.dart';
@@ -178,6 +181,27 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 16),
           _SettingsSection(
+            title: 'Privacy and alerts',
+            icon: Icons.privacy_tip_outlined,
+            color: AppColors.indigo,
+            children: [
+              _SettingsTile(
+                icon: Icons.smart_toy_outlined,
+                title: 'AI data controls',
+                subtitle: 'Choose exactly which private data AI may analyze',
+                onTap: () => _showAiPrivacy(context),
+              ),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                icon: Icons.notifications_active_outlined,
+                title: 'Notification preferences',
+                subtitle: 'Categories, device alerts, and quiet hours',
+                onTap: () => _showNotificationPreferences(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SettingsSection(
             title: 'Account',
             icon: Icons.person_rounded,
             color: AppColors.teal,
@@ -194,6 +218,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: 'Security',
                 subtitle: 'Change password and app lock settings',
                 onTap: () => _openSecurity(context),
+              ),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                icon: Icons.download_rounded,
+                title: 'Export my data',
+                subtitle: 'Copy a portable JSON export to the clipboard',
+                onTap: () => _exportData(context),
+              ),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                icon: Icons.delete_forever_outlined,
+                title: 'Delete account and data',
+                subtitle: 'Permanently remove your ActiBind account',
+                onTap: () => _deleteAccount(context),
               ),
             ],
           ),
@@ -395,6 +433,81 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _showAiPrivacy(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (_) => const _AiPrivacyDialog(),
+  );
+
+  void _showNotificationPreferences(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (_) => const _NotificationPreferencesDialog(),
+  );
+
+  Future<void> _exportData(BuildContext context) async {
+    try {
+      final count = await AccountDataService.copyExportToClipboard();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        this.context,
+      ).showSnackBar(SnackBar(content: Text('$count records copied as JSON.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        this.context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $error')));
+    }
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Permanently delete account?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This removes your account and all associated data. This cannot be undone.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Type DELETE to confirm',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              controller.text.trim() == 'DELETE',
+            ),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (confirmed != true) return;
+    try {
+      await AccountDataService.deleteAccount();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        this.context,
+      ).showSnackBar(SnackBar(content: Text('Deletion failed: $error')));
+    }
+  }
+
   void _showHelp(BuildContext context) => showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -455,6 +568,183 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     final name = _name.text.trim();
     if (name.isNotEmpty) Navigator.pop(context, name);
   }
+}
+
+class _AiPrivacyDialog extends StatelessWidget {
+  const _AiPrivacyDialog();
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: PrivacyController.instance,
+    builder: (context, _) {
+      final privacy = PrivacyController.instance;
+      return AlertDialog(
+        title: const Text('AI data controls'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Only enabled sources are included in new AI requests. Browser titles and notes are off by default.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                _PrivacySwitch(
+                  label: 'Phone and PC activity',
+                  value: privacy.includeDeviceActivity,
+                  keyName: 'device_activity',
+                ),
+                _PrivacySwitch(
+                  label: 'Browser tab/window titles',
+                  value: privacy.includeBrowserTitles,
+                  keyName: 'browser_titles',
+                  enabled: privacy.includeDeviceActivity,
+                ),
+                _PrivacySwitch(
+                  label: 'Notes content',
+                  value: privacy.includeNotes,
+                  keyName: 'notes',
+                ),
+                _PrivacySwitch(
+                  label: 'Family profiles',
+                  value: privacy.includeFamilyProfiles,
+                  keyName: 'family_profiles',
+                ),
+                _PrivacySwitch(
+                  label: 'Current weather',
+                  value: privacy.includeWeather,
+                  keyName: 'weather',
+                ),
+                _PrivacySwitch(
+                  label: 'Public holidays',
+                  value: privacy.includeHolidays,
+                  keyName: 'holidays',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Done'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _PrivacySwitch extends StatelessWidget {
+  const _PrivacySwitch({
+    required this.label,
+    required this.value,
+    required this.keyName,
+    this.enabled = true,
+  });
+  final String label;
+  final bool value;
+  final String keyName;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label, style: const TextStyle(fontSize: 13)),
+    value: value,
+    onChanged: enabled
+        ? (value) => PrivacyController.instance.setValue(keyName, value)
+        : null,
+  );
+}
+
+class _NotificationPreferencesDialog extends StatelessWidget {
+  const _NotificationPreferencesDialog();
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: NotificationPreferencesController.instance,
+    builder: (context, _) {
+      final prefs = NotificationPreferencesController.instance;
+      return AlertDialog(
+        title: const Text('Notification preferences'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _NotificationSwitch(
+                  label: 'Activity reminders',
+                  value: prefs.activityReminders,
+                  keyName: 'activities',
+                ),
+                _NotificationSwitch(
+                  label: 'Routine reminders',
+                  value: prefs.routineReminders,
+                  keyName: 'routines',
+                ),
+                _NotificationSwitch(
+                  label: 'Phone break warnings',
+                  value: prefs.phoneBreaks,
+                  keyName: 'phone_breaks',
+                ),
+                _NotificationSwitch(
+                  label: 'PC/laptop break warnings',
+                  value: prefs.pcBreaks,
+                  keyName: 'pc_breaks',
+                ),
+                _NotificationSwitch(
+                  label: 'Daily summary',
+                  value: prefs.dailySummary,
+                  keyName: 'daily_summary',
+                ),
+                _NotificationSwitch(
+                  label: 'Quiet hours (10 PM–7 AM)',
+                  value: prefs.quietHours,
+                  keyName: 'quiet_hours',
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Server synchronization is applied after the notification-preferences migration is deployed.',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Done'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _NotificationSwitch extends StatelessWidget {
+  const _NotificationSwitch({
+    required this.label,
+    required this.value,
+    required this.keyName,
+  });
+  final String label;
+  final bool value;
+  final String keyName;
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label, style: const TextStyle(fontSize: 13)),
+    value: value,
+    onChanged: (value) =>
+        NotificationPreferencesController.instance.setEnabled(keyName, value),
+  );
 }
 
 class _AppearanceOption extends StatelessWidget {
@@ -535,9 +825,15 @@ class _SettingsSection extends StatelessWidget {
               child: Icon(icon, size: 19, color: color),
             ),
             const SizedBox(width: 10),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                title,
+                softWrap: true,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),

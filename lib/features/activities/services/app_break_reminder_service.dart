@@ -1,4 +1,5 @@
 import 'package:actibind/core/services/notification_service.dart';
+import 'package:actibind/core/settings/notification_preferences_controller.dart';
 import 'package:actibind/features/activities/models/app_usage.dart';
 import 'package:actibind/features/activities/services/usage_stats_service.dart';
 import 'package:flutter/foundation.dart';
@@ -16,6 +17,10 @@ abstract final class AppBreakReminderService {
 
   static Future<void> checkNow() async {
     if (_checking || !UsageStatsService.isSupported) return;
+    final notificationPrefs = NotificationPreferencesController.instance;
+    if (!notificationPrefs.phoneBreaks || _isQuietTime(notificationPrefs)) {
+      return;
+    }
     _checking = true;
     try {
       if (!await UsageStatsService.hasPermission()) return;
@@ -48,6 +53,14 @@ abstract final class AppBreakReminderService {
     } finally {
       _checking = false;
     }
+  }
+
+  static bool _isQuietTime(NotificationPreferencesController prefs) {
+    if (!prefs.quietHours) return false;
+    final hour = DateTime.now().hour;
+    return prefs.quietStartHour > prefs.quietEndHour
+        ? hour >= prefs.quietStartHour || hour < prefs.quietEndHour
+        : hour >= prefs.quietStartHour && hour < prefs.quietEndHour;
   }
 
   static String _dayKey(DateTime date) =>

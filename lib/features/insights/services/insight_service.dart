@@ -1,5 +1,6 @@
 import 'package:actibind/core/services/supabase_service.dart';
 import 'package:actibind/core/services/home_widget_service.dart';
+import 'package:actibind/core/settings/privacy_controller.dart';
 import 'package:actibind/features/activities/services/activity_service.dart';
 import 'package:actibind/features/activities/services/holiday_service.dart';
 import 'package:actibind/features/activities/services/usage_stats_service.dart';
@@ -110,6 +111,7 @@ class InsightService {
     }
 
     final now = DateTime.now();
+    final privacy = PrivacyController.instance;
     final from = DateTime(
       now.year,
       now.month,
@@ -136,21 +138,27 @@ class InsightService {
 
     CurrentWeather? currentWeather;
     var holidays = const <dynamic>[];
-    try {
-      currentWeather = await WeatherService.getCurrentWeather(
-        latitude: 14.5995,
-        longitude: 120.9842,
-      );
-    } catch (_) {}
-    try {
-      final holidayLists = await Future.wait(
-        {
-          from.year,
-          to.year,
-        }.map((year) => HolidayService.getHolidays(year: year)),
-      );
-      holidays = holidayLists.expand((items) => items).toList(growable: false);
-    } catch (_) {}
+    if (privacy.includeWeather) {
+      try {
+        currentWeather = await WeatherService.getCurrentWeather(
+          latitude: 14.5995,
+          longitude: 120.9842,
+        );
+      } catch (_) {}
+    }
+    if (privacy.includeHolidays) {
+      try {
+        final holidayLists = await Future.wait(
+          {
+            from.year,
+            to.year,
+          }.map((year) => HolidayService.getHolidays(year: year)),
+        );
+        holidays = holidayLists
+            .expand((items) => items)
+            .toList(growable: false);
+      } catch (_) {}
+    }
 
     final dates = [
       for (var offset = 0; offset < 7; offset++)
@@ -172,19 +180,24 @@ class InsightService {
 
     final pcUsage = <Map<String, Object?>>[];
     final pcWindowActivity = <Map<String, Object?>>[];
-    for (final device in devices.where((item) => item.isPc == true)) {
+    for (final device in devices.where(
+      (item) => privacy.includeDeviceActivity && item.isPc == true,
+    )) {
       try {
-        final results = await Future.wait([
+        final results = await Future.wait<dynamic>([
           DeviceAppActivityService.getForDevice(
             deviceId: device.id as String,
             start: from,
             end: now,
           ),
-          DeviceAppActivityService.getWindowActivityForDevice(
-            deviceId: device.id as String,
-            start: from,
-            end: now,
-          ),
+          if (privacy.includeBrowserTitles)
+            DeviceAppActivityService.getWindowActivityForDevice(
+              deviceId: device.id as String,
+              start: from,
+              end: now,
+            )
+          else
+            Future.value(const <Map<String, Object?>>[]),
         ]);
         final rows = results[0] as List<dynamic>;
         pcUsage.addAll(
@@ -216,7 +229,9 @@ class InsightService {
     }
 
     var usage = const <Map<String, Object>>[];
-    if (includeUsage && UsageStatsService.isSupported) {
+    if (includeUsage &&
+        privacy.includeDeviceActivity &&
+        UsageStatsService.isSupported) {
       try {
         if (await UsageStatsService.hasPermission()) {
           final rows = await UsageStatsService.getUsage(start: from, end: now);
@@ -295,7 +310,7 @@ class InsightService {
                 },
               )
               .toList(growable: false),
-          'notes': notes
+          'notes': (privacy.includeNotes ? notes : const <dynamic>[])
               .take(30)
               .map(
                 (item) => {
@@ -305,18 +320,19 @@ class InsightService {
                 },
               )
               .toList(growable: false),
-          'family_profiles': children
-              .map(
-                (item) => {
-                  'name': item.name,
-                  'age_range': item.ageRange,
-                  'device': item.device,
-                  'connected': item.connected,
-                  'restrictions_active': item.restrictionsActive,
-                  'screen_time_minutes': item.screenTimeMinutes,
-                },
-              )
-              .toList(growable: false),
+          'family_profiles':
+              (privacy.includeFamilyProfiles ? children : const <dynamic>[])
+                  .map(
+                    (item) => {
+                      'name': item.name,
+                      'age_range': item.ageRange,
+                      'device': item.device,
+                      'connected': item.connected,
+                      'restrictions_active': item.restrictionsActive,
+                      'screen_time_minutes': item.screenTimeMinutes,
+                    },
+                  )
+                  .toList(growable: false),
           'history': history
               .where(
                 (item) =>
@@ -328,6 +344,14 @@ class InsightService {
               .toList(growable: false),
           'timezone': now.timeZoneName,
           'local_time': now.toIso8601String(),
+          'privacy_selection': {
+            'device_activity': privacy.includeDeviceActivity,
+            'browser_titles': privacy.includeBrowserTitles,
+            'notes': privacy.includeNotes,
+            'family_profiles': privacy.includeFamilyProfiles,
+            'weather': privacy.includeWeather,
+            'holidays': privacy.includeHolidays,
+          },
           'weather': currentWeather == null
               ? null
               : {
@@ -362,6 +386,24 @@ class InsightService {
         );
       }
       rethrow;
+    } catch (_) {
+      if (mode == 'home' || mode == 'daily') {
+        final incompleteTodos = todos
+            .where((item) => item.completed != true)
+            .length;
+        final next = activities
+            .where((item) => item.startsAt.isAfter(now))
+            .firstOrNull;
+        return [
+          if (next != null)
+            'Your next activity is ${next.name} at ${_clock(next.startsAt)}.',
+          if (incompleteTodos > 0)
+            'You have $incompleteTodos incomplete ${incompleteTodos == 1 ? 'task' : 'tasks'}; choose one clear next action.',
+          if (next == null && incompleteTodos == 0)
+            'No urgent schedule or task issue was found in the available offline data.',
+        ].join(' ');
+      }
+      rethrow;
     }
 
     if (response.status != 200 || response.data is! Map) {
@@ -373,6 +415,12 @@ class InsightService {
       throw Exception('The insights service returned an empty response.');
     }
     return insight.trim();
+  }
+
+  static String _clock(DateTime value) {
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${value.hour < 12 ? 'AM' : 'PM'}';
   }
 
   static Future<String> _cachedRequest({

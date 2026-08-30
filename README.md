@@ -1,6 +1,20 @@
-# actibind
+# ActiBind
 
-A new Flutter project.
+ActiBind is a Flutter activity-planning and digital-wellbeing app that combines
+schedules, routines, tasks, phone usage, synchronized computer activity,
+weather, holidays, notifications, widgets, and privacy-controlled AI insights.
+
+## Quality checks
+
+```powershell
+flutter pub get
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+```
+
+See `docs/PRIVACY.md` for the implemented data controls and
+`docs/RELEASE_CHECKLIST.md` before publishing.
 
 ## Groq-powered insights
 
