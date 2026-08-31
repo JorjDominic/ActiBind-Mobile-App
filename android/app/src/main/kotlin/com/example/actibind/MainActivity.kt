@@ -23,11 +23,6 @@ class MainActivity : FlutterActivity() {
     private val iconCache = LruCache<String, ByteArray>(64)
     @Volatile private var labelCache: Map<String, String>? = null
 
-    override fun onCreate(savedInstanceState: android.os.Bundle?) {
-        super.onCreate(savedInstanceState)
-        AppBreakReminderWorker.schedule(applicationContext)
-    }
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)

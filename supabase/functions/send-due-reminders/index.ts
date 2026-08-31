@@ -247,7 +247,7 @@ Deno.serve(async (request) => {
         const appName = officialAppName(usage.app_name, usage.package_name ?? "");
         const deviceName = deviceNames.get(usage.device_id) ?? "your PC";
         reminders.push({
-          key: `pc-break:${usage.device_id}:${usage.id}:${local.date}:${milestone}h`,
+          key: `pc-break:${usage.device_id}:${usage.id}:${local.date}:${milestone}h:fcm-bg-v2`,
           userId: usage.user_id,
           title: `${milestone}-hour app milestone`,
           body: `PC/Laptop activity on ${deviceName}: ${appName} has reached ${milestone} hours today. Consider taking a short break.`,
@@ -350,6 +350,7 @@ Deno.serve(async (request) => {
       if (claimError) continue;
       let sentForReminder = 0;
       for (const device of tokenRows.filter((token) => token.user_id === reminder.userId)) {
+        const isDeviceActivityReminder = reminder.key.startsWith("pc-break:");
         const firebaseResponse = await fetch(
           `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
           {
@@ -361,7 +362,14 @@ Deno.serve(async (request) => {
             body: JSON.stringify({
               message: {
                 token: device.token,
-                notification: { title: reminder.title, body: reminder.body },
+                // Device-activity alerts are high-priority data messages. This
+                // makes Firebase start the registered background handler, which
+                // posts the break notification even when Flutter is not open.
+                // Schedule reminders retain notification payloads so Android can
+                // display those directly without starting Dart.
+                ...(isDeviceActivityReminder
+                  ? {}
+                  : { notification: { title: reminder.title, body: reminder.body } }),
                 data: {
                   title: reminder.title,
                   body: reminder.body,
@@ -373,14 +381,16 @@ Deno.serve(async (request) => {
                   priority: "high",
                   ttl: "86400s",
                   collapse_key: reminder.key,
-                  notification: {
-                    channel_id: reminder.key.startsWith("pc-break:")
-                      ? "wellbeing_break_reminders_v1"
-                      : "schedule_reminders_v3",
-                    notification_priority: "PRIORITY_MAX",
-                    visibility: "PUBLIC",
-                    sound: "default",
-                  },
+                  ...(isDeviceActivityReminder
+                    ? {}
+                    : {
+                      notification: {
+                        channel_id: "schedule_reminders_v3",
+                        notification_priority: "PRIORITY_MAX",
+                        visibility: "PUBLIC",
+                        sound: "default",
+                      },
+                    }),
                 },
               },
             }),

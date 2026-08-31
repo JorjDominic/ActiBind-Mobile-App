@@ -21,6 +21,9 @@ abstract final class PushNotificationService {
     _initialized = true;
 
     final messaging = FirebaseMessaging.instance;
+    // FCM messages reference our Android channels. Create them before a push can
+    // arrive so delivery does not fall back to Firebase's generic channel.
+    await NotificationService.initialize();
     await messaging.setAutoInitEnabled(true);
     await messaging.requestPermission(alert: true, badge: true, sound: true);
 
@@ -88,6 +91,7 @@ abstract final class PushNotificationService {
           DateTime.now().millisecondsSinceEpoch.remainder(1000000000),
       title: title,
       body: body,
+      isBreakReminder: message.data['type'] == 'pc-break',
     );
   }
 

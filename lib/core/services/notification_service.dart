@@ -214,6 +214,7 @@ abstract final class NotificationService {
     required int id,
     required String title,
     required String body,
+    bool isBreakReminder = false,
   }) async {
     if (!_supported) return;
     await initialize();
@@ -221,29 +222,7 @@ abstract final class NotificationService {
       id: id,
       title: title,
       body: body,
-      notificationDetails: _details,
-    );
-  }
-
-  static Future<void> showBreakReminder({
-    required int id,
-    required String appName,
-    required Duration usage,
-    required int milestoneHours,
-  }) async {
-    if (!_supported) return;
-    await initialize();
-    final hours = usage.inMinutes / 60;
-    final formattedHours = hours == hours.roundToDouble()
-        ? hours.toStringAsFixed(0)
-        : hours.toStringAsFixed(1);
-    await _plugin.show(
-      id: id,
-      title: '$milestoneHours-hour app milestone',
-      body:
-          'Phone activity: You have used $appName for $formattedHours hours today. '
-          'Rest your eyes, stretch, and come back when you are ready.',
-      notificationDetails: _breakDetails,
+      notificationDetails: isBreakReminder ? _breakDetails : _details,
     );
   }
 
