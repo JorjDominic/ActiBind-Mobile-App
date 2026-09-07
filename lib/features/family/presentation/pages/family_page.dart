@@ -51,6 +51,13 @@ class _FamilyPageState extends State<FamilyPage> {
     if (saved == true) await _load();
   }
 
+  Future<void> _openLinkDevice() => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const _LinkDeviceSheet(),
+  );
+
   Future<void> _delete(ChildProfile profile) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -173,11 +180,13 @@ class _FamilyPageState extends State<FamilyPage> {
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: null,
-            icon: const Icon(Icons.lock_outline_rounded),
-            label: const Text('Link Child Device'),
+            onPressed: _openLinkDevice,
+            icon: const Icon(Icons.add_link_rounded),
+            label: const Text('Link a Device'),
           ),
           const SizedBox(height: 24),
+          _DeviceRolesCard(profiles: _profiles, onLinkDevice: _openLinkDevice),
+          const SizedBox(height: 14),
           shad.Card(
             filled: true,
             fillColor: AppColors.indigo.withValues(alpha: .055),
@@ -210,6 +219,12 @@ class _FamilyPageState extends State<FamilyPage> {
                             fontWeight: FontWeight.w600,
                             height: 1.25,
                           ),
+                        ),
+                        const SizedBox(height: 7),
+                        const _DeviceRoleBadge(
+                          label: 'This phone · Parent device',
+                          icon: Icons.admin_panel_settings_rounded,
+                          color: AppColors.indigo,
                         ),
                         const SizedBox(height: 5),
                         Text(
@@ -275,6 +290,219 @@ class _ActiveBadge extends StatelessWidget {
             color: AppColors.teal,
             fontWeight: FontWeight.w700,
             fontSize: 12,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DeviceRolesCard extends StatelessWidget {
+  const _DeviceRolesCard({required this.profiles, required this.onLinkDevice});
+
+  final List<ChildProfile> profiles;
+  final VoidCallback onLinkDevice;
+
+  @override
+  Widget build(BuildContext context) {
+    final linkedProfiles = profiles
+        .where((profile) => profile.connected)
+        .toList();
+    return shad.Card(
+      filled: true,
+      fillColor: AppColors.teal.withValues(alpha: .035),
+      borderColor: AppColors.teal.withValues(alpha: .16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Family devices',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'See which devices manage the family and which use Child Mode.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: onLinkDevice,
+                  tooltip: 'Link a device',
+                  icon: const Icon(Icons.add_link_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const _DeviceRoleTile(
+              icon: Icons.phone_android_rounded,
+              title: 'This phone',
+              subtitle: 'Controls profiles, schedules, and restrictions',
+              badgeLabel: 'Parent device · Family owner',
+              badgeIcon: Icons.admin_panel_settings_rounded,
+              color: AppColors.indigo,
+            ),
+            if (linkedProfiles.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final profile in linkedProfiles) ...[
+                _DeviceRoleTile(
+                  icon: Icons.smartphone_rounded,
+                  title: profile.device,
+                  subtitle: 'Assigned to ${profile.name}',
+                  badgeLabel: 'Child device',
+                  badgeIcon: Icons.child_care_rounded,
+                  color: profile.color,
+                ),
+                if (profile != linkedProfiles.last) const SizedBox(height: 10),
+              ],
+            ] else ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.smartphone_rounded,
+                      color: AppColors.muted,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'No child devices linked yet',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onLinkDevice,
+                      child: const Text('Link'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeviceRoleTile extends StatelessWidget {
+  const _DeviceRoleTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.badgeLabel,
+    required this.badgeIcon,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String badgeLabel;
+  final IconData badgeIcon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .06),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: color.withValues(alpha: .16)),
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: color, size: 21),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 7),
+              _DeviceRoleBadge(
+                label: badgeLabel,
+                icon: badgeIcon,
+                color: color,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DeviceRoleBadge extends StatelessWidget {
+  const _DeviceRoleBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .11),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -418,6 +646,16 @@ class _ChildCard extends StatelessWidget {
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: 7),
+                  _DeviceRoleBadge(
+                    label: child.connected
+                        ? 'Child device · Linked'
+                        : 'Child device · Not linked',
+                    icon: child.connected
+                        ? Icons.link_rounded
+                        : Icons.link_off_rounded,
+                    color: child.connected ? AppColors.teal : AppColors.muted,
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -667,6 +905,7 @@ class _LinkDeviceSheet extends StatefulWidget {
 class _LinkDeviceSheetState extends State<_LinkDeviceSheet> {
   final controller = TextEditingController();
   String? code;
+  String role = 'child';
 
   @override
   void dispose() {
@@ -687,22 +926,73 @@ class _LinkDeviceSheetState extends State<_LinkDeviceSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Link Child Device',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('Link a Device', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            "Connect a child's device to manage schedules, screen time, and restrictions remotely.",
+            'Choose how this device will be used in your family.',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('Device role', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 10),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'child',
+                icon: Icon(Icons.child_care_rounded),
+                label: Text('Child'),
+              ),
+              ButtonSegment(
+                value: 'parent',
+                icon: Icon(Icons.admin_panel_settings_rounded),
+                label: Text('Parent'),
+              ),
+            ],
+            selected: {role},
+            onSelectionChanged: (selection) =>
+                setState(() => role = selection.first),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (role == 'child' ? AppColors.coral : AppColors.indigo)
+                  .withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  role == 'child'
+                      ? Icons.shield_rounded
+                      : Icons.settings_remote_rounded,
+                  size: 19,
+                  color: role == 'child' ? AppColors.coral : AppColors.indigo,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    role == 'child'
+                        ? 'Child devices receive schedules and restrictions from a parent device.'
+                        : 'Parent devices can manage family profiles and linked child devices.',
+                    style: const TextStyle(fontSize: 12, height: 1.35),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 18),
           OutlinedButton.icon(
             onPressed: () => setState(() => code = '482915'),
             icon: const Icon(Icons.pin_rounded),
-            label: const Text('Generate Linking Code'),
+            label: Text(
+              role == 'child'
+                  ? 'Generate Child Device Code'
+                  : 'Generate Parent Invite Code',
+            ),
           ),
           if (code != null) ...[
             const SizedBox(height: 12),
@@ -748,7 +1038,11 @@ class _LinkDeviceSheetState extends State<_LinkDeviceSheet> {
                     );
                   }
                 : null,
-            child: const Text('Link Device'),
+            child: Text(
+              role == 'child'
+                  ? 'Link as Child Device'
+                  : 'Link as Parent Device',
+            ),
           ),
           const SizedBox(height: 8),
           const Text(

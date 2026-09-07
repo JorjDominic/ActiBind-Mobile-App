@@ -1,0 +1,61 @@
+<mxfile host="app.diagrams.net" agent="Codex" version="24.7.17">
+  <diagram id="user-flow" name="ActiBind User Flowchart">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="ActiBind User Flowchart" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="20" width="260" height="30" as="geometry"/></mxCell>
+        <mxCell id="start" value="Start ActiBind" style="ellipse;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="625" y="55" width="150" height="50" as="geometry"/></mxCell>
+        <mxCell id="login" value="Log In / Sign Up" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="615" y="135" width="170" height="55" as="geometry"/></mxCell>
+        <mxCell id="home" value="Home Dashboard" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="615" y="220" width="170" height="55" as="geometry"/></mxCell>
+
+        <mxCell id="activities" value="Activities, Routines&#xa;&amp; Tasks" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="45" y="350" width="190" height="60" as="geometry"/></mxCell>
+        <mxCell id="device" value="Device Activity" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="325" y="350" width="170" height="60" as="geometry"/></mxCell>
+        <mxCell id="insights" value="Usage Insights" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="615" y="350" width="170" height="60" as="geometry"/></mxCell>
+        <mxCell id="family" value="Family Mode" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="895" y="350" width="170" height="60" as="geometry"/></mxCell>
+        <mxCell id="settings" value="Settings" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="1165" y="350" width="170" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="manage" value="Add / View / Edit / Delete&#xa;Schedules and Tasks" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="25" y="470" width="230" height="75" as="geometry"/></mxCell>
+        <mxCell id="reminder" value="Receive Schedule&#xa;Reminders" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="55" y="610" width="170" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="viewUsage" value="View Screen Time &amp;&#xa;Application Usage" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="305" y="470" width="210" height="75" as="geometry"/></mxCell>
+        <mxCell id="limit" value="Usage Reached&#xa;2 Hours or More?" style="rhombus;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="330" y="590" width="160" height="105" as="geometry"/></mxCell>
+        <mxCell id="warning" value="Receive Usage Warning" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="325" y="745" width="170" height="55" as="geometry"/></mxCell>
+
+        <mxCell id="viewInsights" value="View Patterns, Progress&#xa;&amp; Usage Trends" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="595" y="470" width="210" height="75" as="geometry"/></mxCell>
+        <mxCell id="review" value="Review Schedule and&#xa;Device Usage" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="610" y="610" width="180" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="manageFamily" value="Manage Child Profiles,&#xa;Limits &amp; App Restrictions" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="870" y="470" width="220" height="75" as="geometry"/></mxCell>
+        <mxCell id="child" value="Activate Child Mode" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="895" y="610" width="170" height="60" as="geometry"/></mxCell>
+        <mxCell id="pin" value="Use Parent PIN&#xa;to Override" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="895" y="745" width="170" height="55" as="geometry"/></mxCell>
+
+        <mxCell id="preferences" value="Manage Notifications,&#xa;Privacy &amp; Preferences" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="1140" y="470" width="220" height="75" as="geometry"/></mxCell>
+        <mxCell id="end" value="End" style="ellipse;whiteSpace=wrap;html=1;strokeWidth=1.5;" vertex="1" parent="1"><mxGeometry x="635" y="830" width="130" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="start" target="login"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="login" target="home"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="home" target="activities"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="home" target="device"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="home" target="insights"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="home" target="family"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="home" target="settings"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="activities" target="manage"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="manage" target="reminder"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="reminder" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="device" target="viewUsage"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="viewUsage" target="limit"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="limit" target="warning"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e14" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="limit" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="warning" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="insights" target="viewInsights"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="viewInsights" target="review"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="review" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="family" target="manageFamily"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="manageFamily" target="child"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="child" target="pin"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="pin" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="settings" target="preferences"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=1.5;" edge="1" parent="1" source="preferences" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
